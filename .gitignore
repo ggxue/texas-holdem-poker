@@ -1,0 +1,6 @@
+/.idea/
+/.tools/
+/artifacts/
+*.exe
+*.test
+coverage.out

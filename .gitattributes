@@ -1,0 +1,6 @@
+# Preserve vendored skill hashes across Windows and Unix checkouts.
+.agents/** text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.ps1 text eol=lf
