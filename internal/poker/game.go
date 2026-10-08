@@ -47,7 +47,7 @@ type handView struct {
 }
 
 func validAction(action string) bool {
-	return action == "join" || action == "start" || action == "check" || action == "bet" || action == "call" || action == "fold" // 限定本票公开命令范围。
+	return action == "join" || action == "start" || action == "check" || action == "bet" || action == "call" || action == "fold" || action == "leave" // 限定本票公开命令范围。
 }
 
 func shuffledDeck() ([]Card, error) {
@@ -109,6 +109,9 @@ func (s *room) setBalance(id string, n int64) {
 
 func (a *App) gameCommand(id string, cmd command) string {
 	s := &a.state              // 全部牌局变更在App锁内处理。
+	if cmd.Action == "leave" { // 主动退出不需要等到本人回合。
+		return s.depart(id) // 立即释放座位并失去未结算资格。
+	}
 	if cmd.Action == "start" { // 房主手动开局。
 		if s.Host != id { // 核对请求身份是否为房主。
 			return "host_only" // 拒绝非房主开局。
@@ -202,6 +205,9 @@ func (s *room) advance() string {
 				h.deal(5 - len(h.Board)) // 补足五张公共牌，不重复发河牌。
 				return s.settle(true)    // 完成摊牌和单池派奖。
 			} // 无人欠注时补齐五张公共牌。
+		}
+		if h.Actor >= 0 && !h.Players[h.Actor].Folded && !h.Players[h.Actor].AllIn && !h.Players[h.Actor].acted { // 他人退出不重置当前合法机会。
+			return "" // 保留原行动者及行动标识。
 		}
 		next := -1                                            // 查找固定顺序下尚未行动的玩家。
 		for offset := 1; offset <= len(h.Players); offset++ { // 固定顺序继续，轮末再回应此前过牌者。
@@ -370,4 +376,38 @@ func (s *room) act(action string) string {
 	p.AllIn = p.AllIn || s.balance(p.ID) == 0  // 全押资格不因重连补给而重置。
 	p.acted = true                             // 记录当前机会已经完成。
 	return ""                                  // 同一内存变更统一生效。
+}
+
+func (s *room) depart(id string) string {
+	seat := -1                         // 查找该身份当前占用的真人座位。
+	for i, occupant := range s.Seats { // 只释放本人座位。
+		if occupant == id { // 确认身份与座位一致。
+			seat = i // 保存需要释放的位置。
+			break    // 一名真人最多占一个位置。
+		}
+	}
+	if seat < 0 { // 未入房身份没有可退出的座位。
+		return "not_in_room" // 退出请求不影响任何其他玩家。
+	}
+	s.Seats[seat] = "" // 立即释放座位，剩余余额仍绑定原身份。
+	if s.Host == id {  // 房主离开后自动交接。
+		s.Host = ""                        // 默认无真人时没有房主。
+		for _, occupant := range s.Seats { // 最多只剩一名真人，保持其原座位。
+			if occupant != "" { // 找到仍在房间的人。
+				s.Host = occupant // 把房主交给留房真人。
+				break             // 完成交接后停止查找。
+			}
+		}
+	}
+	h := s.Hand                            // 检查尚未结算的本局资格。
+	if h == nil || h.Stage == "finished" { // 已结算奖项不能因退出撤销。
+		return "" // 无须继续改变本局。
+	}
+	for i := range h.Players { // 资格绑定开局身份，不绑定可重用座位。
+		if h.Players[i].ID == id { // 仅影响该身份的参赛资格。
+			h.Players[i].Folded = true // 即使全押也失去未结算领奖资格。
+			h.Players[i].acted = true  // 不再等待该玩家应答。
+		}
+	}
+	return s.advance() // 必要时跳过空位或提前结算，所有投入不退。
 }

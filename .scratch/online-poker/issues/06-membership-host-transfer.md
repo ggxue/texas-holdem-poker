@@ -2,7 +2,7 @@
 
 > 当前覆盖：状态只在单进程内存中；重新入房本人余额设100；原有数据库提交/真实数据库fixture/跨重启持久性条款已撤销，不执行。游戏规则和公开seam沿用修订spec；详见[当前决定](../memory-reset-decision.md)。
 
-Status: ready-for-agent
+Status: in-progress
 Type: implementation
 Spec: [在线德州扑克首版规格](../spec.md)
 Blocked by: [04](04-bet-allin-single-pot.md)
@@ -30,9 +30,14 @@ Primary acceptance cases: AC10–AC12、AC31
 
 ## Validation
 
-Implementation baseline: 待实施开始、任何代码编辑前记录 SHA。
+Implementation baseline: 56dce87222fbb482319cc69180754da9fed5d79c。
 
-尚未实施，本次发布不构成游戏验收通过。
+实现及自动化通过；实际浏览器/最终检查待12，不提前标done。
+- RED：TestAC11And12、TestAC29Active因leave未支持返回400退出1；中途入房现有冻结名单行为已通过。
+- GREEN：scripts/test-go.ps1 -Package ./internal/poker -Run 'TestAC(10|11|29Active)'退出0。包括HTTP/原始WebSocket等待者隐私、下一局资格、座位重用、房主交接、全押离房无退款、结算后奖项不撤销。
+- Node --check网页JS与gofmt退出0。
+- Standards/Spec均0项问题；审查git diff --cached 56dce87 --。
+- 普通关页不等于主动退出；07接管与08宽限尚待后票。完整测试/构建/race/真实浏览器检查在12汇总。
 按[项目验证约定](../../../docs/agents/harness.md)记录命令、退出码、目标 RED/GREEN、
 可复现浏览器/内存行为证据和限制；格式、vet、测试、构建及适用并发检查缺工具或失败不得静默跳过。
 完成前以实施 baseline 和本规格分别审查 Standards/Spec，记录结果；仅验收满足才标 done。

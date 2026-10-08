@@ -5,6 +5,7 @@ const retryButton = document.getElementById("retry");
 const gameInfo = document.getElementById("game-info");
 const actions = document.getElementById("actions");
 let sending = false;
+let leftRoom = false;
 const ranks = {11: "J", 12: "Q", 13: "K", 14: "A"};
 const suitNames = ["♦", "♣", "♥", "♠"];
 const stageNames = {preflop: "翻牌前", flop: "翻牌", turn: "转牌", river: "河牌", finished: "本局结束"};
@@ -28,6 +29,7 @@ const messages = {
   not_your_turn: "尚未轮到你。",
   no_active_hand: "请等待房主开始新一局。",
   invalid_action: "当前不能执行该操作。",
+  not_in_room: "你已离开房间，可重新入房。",
 };
 function render(view) {
   if (view.error) { statusLine.textContent = messages[view.error] || "暂时无法完成操作。"; return; }
@@ -75,6 +77,7 @@ function render(view) {
     const labels = {check: "过牌", fold: "弃牌", bet: `下注 ${hand.betAmount}${hand.betAmount < 10 ? "（不足全押）" : ""}`, call: `跟注 ${hand.callAmount}${hand.callAmount < hand.target ? "（不足全押）" : ""}`};
     addAction(action, labels[action] || action);
   }
+  if (view.seats.some(player => player?.id === view.you)) addAction("leave", "退出房间");
 }
 function addAction(action, label) {
   const button = document.createElement("button");
@@ -94,6 +97,13 @@ async function sendAction(action) {
     const response = await fetch("/api/command", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(command)});
     const result = await response.json();
     render(result);
+    if (response.ok && action === "leave") {
+      leftRoom = true;
+      clearTimeout(reconnectTimer);
+      if (socket) { socket.onclose = null; socket.close(); socket = null; }
+      statusLine.textContent = "已退出房间 · 已投入筹码不退";
+      retryButton.textContent = "重新入房";
+    }
     if (result.error) await state();
   } catch { statusLine.textContent = "操作结果待确认，请重新连接查看服务器状态。"; }
   finally { sending = false; if (confirmed) render(confirmed); }
@@ -116,6 +126,8 @@ function pendingJoin(view) {
 async function connect() {
   if (connecting) return;
   connecting = true;
+  leftRoom = false;
+  retryButton.textContent = "重新连接";
   retryButton.disabled = true;
   clearTimeout(reconnectTimer);
   if (socket) { socket.onclose = null; socket.close(); socket = null; }
@@ -150,7 +162,7 @@ function openSocket() {
     try { render(JSON.parse(event.data)); } catch { statusLine.textContent = "状态读取失败，请重新连接。"; }
   };
   connection.onclose = () => {
-    if (socket !== connection) return;
+    if (socket !== connection || leftRoom) return;
     statusLine.textContent = "连接或唤醒中…";
     reconnectTimer = setTimeout(connect, retryDelay);
     retryDelay = Math.min(retryDelay * 2, 15000);
