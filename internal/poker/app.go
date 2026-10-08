@@ -19,6 +19,7 @@ type App struct {
 	clients  map[*connection]struct{}
 	closed   bool
 	deck     func() ([]Card, error)
+	active   map[string]*connection
 }
 
 // Options supplies an offline deterministic deck seam; HTTP never accepts cards.
@@ -35,7 +36,7 @@ func NewWithOptions(options Options) (*App, error) {
 	if deck == nil {
 		deck = shuffledDeck
 	}
-	return &App{state: room{Accounts: map[string]player{}, Bot: player{ID: "bot", Chips: 100}}, requests: map[string]receipt{}, secret: secret, clients: map[*connection]struct{}{}, deck: deck}, nil
+	return &App{state: room{Accounts: map[string]player{}, Bot: player{ID: "bot", Chips: 100}, Controls: map[string]controller{}}, requests: map[string]receipt{}, secret: secret, clients: map[*connection]struct{}{}, active: map[string]*connection{}, deck: deck}, nil
 }
 
 func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -80,7 +81,7 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, 400, view{Error: "invalid_command"})
 			return
 		}
-		if err := decoder.Decode(new(any)); err != io.EOF || !validAction(cmd.Action) || len(cmd.RequestID) == 0 || len(cmd.RequestID) > 128 || cmd.Version < 0 {
+		if err := decoder.Decode(new(any)); err != io.EOF || !validAction(cmd.Action) || len(cmd.RequestID) == 0 || len(cmd.RequestID) > 128 || cmd.Version < 0 || len(cmd.PageID) == 0 || len(cmd.PageID) > 128 || cmd.Control < 0 {
 			writeJSON(w, 400, view{Error: "invalid_command"})
 			return
 		}

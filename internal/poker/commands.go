@@ -13,6 +13,8 @@ type command struct {
 	Action    string `json:"action"`
 	HandID    int64  `json:"handID,omitempty"`
 	TurnID    int64  `json:"turnID,omitempty"`
+	PageID    string `json:"pageID"`
+	Control   int64  `json:"control"`
 }
 
 type outcome struct {
@@ -27,6 +29,12 @@ type receipt struct {
 
 // Caller holds App.mu; state and retry results live only in this process.
 func (a *App) apply(id string, cmd command) (outcome, bool) {
+	control := a.state.Controls[id]
+	if (control.Seen[cmd.PageID] && control.PageID != cmd.PageID) || (cmd.Action != "join" && (control.PageID != cmd.PageID || control.Generation != cmd.Control)) {
+		v := a.state.visibleTo(id)
+		v.Error = "taken_over"
+		return outcome{http.StatusConflict, v}, false
+	}
 	payload, _ := json.Marshal(cmd)
 	hash := sha256.Sum256(payload)
 	key := id + ":" + cmd.RequestID
@@ -69,6 +77,10 @@ func (a *App) apply(id string, cmd command) (outcome, bool) {
 		}
 	} else if seat < 0 {
 		rejection = "room_full"
+	} else if control.Generation == math.MaxInt64 {
+		rejection = "control_exhausted"
+	} else if control.PageID == cmd.PageID && control.Generation != cmd.Control {
+		rejection = "taken_over"
 	} else {
 		// A fresh successful entry resets the available balance, including reconnects.
 		a.state.Accounts[id] = player{ID: id, Chips: 100}
@@ -77,6 +89,19 @@ func (a *App) apply(id string, cmd command) (outcome, bool) {
 			a.state.Host = id
 		}
 		a.state.Version++
+		if control.Seen == nil {
+			control.Seen = map[string]bool{}
+		}
+		control.Seen[cmd.PageID] = true
+		control.PageID = cmd.PageID
+		control.Generation++
+		a.state.Controls[id] = control
+		for c := range a.clients {
+			if c.id == id && c.generation != control.Generation {
+				a.queue(c, view{Error: "taken_over"})
+			}
+		}
+		delete(a.active, id)
 	}
 	result.View = a.state.visibleTo(id)
 	if rejection != "" {

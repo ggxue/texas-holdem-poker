@@ -13,6 +13,7 @@ type gameView struct {
 	You     string         `json:"you"`
 	Host    string         `json:"host"`
 	Error   string         `json:"error"`
+	Control int64          `json:"control"`
 	Seats   [2]*playerView `json:"seats"`
 	Bot     playerView     `json:"bot"`
 	Hand    *struct {
@@ -117,7 +118,7 @@ func TestAC22OnlyTiedWinnersShareOddPot(t *testing.T) {
 	if current.Hand.Players[0].Strength != nil || len(current.Hand.Players[0].Hole) != 0 {
 		t.Fatal("folded hole cards leaked")
 	}
-	status, retry := gameCommand(t, one, server.URL, "start", "start", gameView{Version: started.Version - 1})
+	status, retry := gameCommand(t, one, server.URL, "start", "start", gameView{Version: started.Version - 1, Control: started.Control})
 	if status != 200 || retry.Hand.ID != started.Hand.ID {
 		t.Fatalf("cached start: %d %+v", status, retry)
 	}
@@ -141,7 +142,7 @@ func gameState(t *testing.T, c *http.Client, url string) gameView {
 }
 func gameCommand(t *testing.T, c *http.Client, url, id, action string, v gameView) (int, gameView) {
 	t.Helper()
-	body := map[string]any{"requestID": id, "version": v.Version, "action": action}
+	body := map[string]any{"requestID": id, "version": v.Version, "action": action, "pageID": pageID(c), "control": v.Control}
 	if v.Hand != nil {
 		body["handID"] = v.Hand.ID
 		body["turnID"] = v.Hand.Turn

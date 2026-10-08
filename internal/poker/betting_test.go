@@ -80,7 +80,7 @@ func TestAC14And15OneBetAndEarlierCheckerResponds(t *testing.T) {
 	if status != 409 || old.Version != before.Version {
 		t.Fatal("stale action changed state")
 	}
-	data := `{"requestID":"amount","version":` + strconv.FormatInt(v.Version, 10) + `,"action":"bet","amount":6}`
+	data := `{"requestID":"amount","version":` + strconv.FormatInt(v.Version, 10) + `,"action":"bet","amount":6,"pageID":"` + pageID(c[0]) + `","control":` + strconv.FormatInt(v.Control, 10) + `,"handID":` + strconv.FormatInt(v.Hand.ID, 10) + `,"turnID":` + strconv.FormatInt(v.Hand.Turn, 10) + `}`
 	response, e := c[0].Post(s.URL+"/api/command", "application/json", strings.NewReader(data))
 	if e != nil {
 		t.Fatal(e)

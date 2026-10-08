@@ -2,6 +2,7 @@ package poker
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -18,7 +19,9 @@ func gameSocket(t *testing.T, c *http.Client, address string) *websocket.Conn {
 	for _, cookie := range c.Jar.Cookies(u) {
 		header.Add("Cookie", cookie.String())
 	}
-	ws, _, e := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(address, "http")+"/api/ws", header)
+	current := getRoom(t, c, address)
+	query := url.Values{"pageID": {pageID(c)}, "control": {fmt.Sprint(current.Control)}}
+	ws, _, e := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(address, "http")+"/api/ws?"+query.Encode(), header)
 	if e != nil {
 		t.Fatal(e)
 	}

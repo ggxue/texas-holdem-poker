@@ -4,17 +4,25 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
 
 type connection struct {
-	id     string
-	socket *websocket.Conn
-	send   chan []byte
-	ctx    context.Context
-	cancel context.CancelFunc
+	id         string
+	socket     *websocket.Conn
+	send       chan notification
+	ctx        context.Context
+	cancel     context.CancelFunc
+	pageID     string
+	generation int64
+}
+
+type notification struct {
+	data     []byte
+	terminal bool
 }
 
 func (a *App) serveSocket(w http.ResponseWriter, r *http.Request) {
@@ -30,13 +38,30 @@ func (a *App) serveSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	upgrader := websocket.Upgrader{HandshakeTimeout: 5 * time.Second}
+	pageID := r.URL.Query().Get("pageID")
+	generation, _ := strconv.ParseInt(r.URL.Query().Get("control"), 10, 64)
+	control := a.state.Controls[id]
+	seated := false
+	for _, occupant := range a.state.Seats {
+		seated = seated || occupant == id
+	}
+	if !seated || pageID == "" || control.PageID != pageID || control.Generation != generation {
+		a.mu.Unlock()
+		writeJSON(w, 403, view{Error: "taken_over"})
+		return
+	}
 	socket, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		a.mu.Unlock()
 		return
 	}
 	ctx, cancel := context.WithCancel(r.Context())
-	c := &connection{id: id, socket: socket, send: make(chan []byte, 16), ctx: ctx, cancel: cancel}
+	c := &connection{id: id, socket: socket, send: make(chan notification, 16), ctx: ctx, cancel: cancel, pageID: pageID, generation: generation}
+	if old := a.active[id]; old != nil {
+		old.cancel()
+		_ = old.socket.Close()
+	}
+	a.active[id] = c
 	a.clients[c] = struct{}{}
 	a.queue(c, a.state.visibleTo(id))
 	a.mu.Unlock()
@@ -49,6 +74,9 @@ func (a *App) serveSocket(w http.ResponseWriter, r *http.Request) {
 		<-writerDone
 		a.mu.Lock()
 		delete(a.clients, c)
+		if a.active[id] == c {
+			delete(a.active, id)
+		}
 		a.mu.Unlock()
 	}()
 	for {
@@ -73,7 +101,10 @@ func (c *connection) writeLoop() {
 			if err := c.socket.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
 				return
 			}
-			if err := c.socket.WriteMessage(websocket.TextMessage, message); err != nil {
+			if err := c.socket.WriteMessage(websocket.TextMessage, message.data); err != nil {
+				return
+			}
+			if message.terminal {
 				return
 			}
 		}
@@ -89,7 +120,7 @@ func (a *App) queue(c *connection, v view) {
 		return
 	}
 	select {
-	case c.send <- data:
+	case c.send <- notification{data: data, terminal: v.Error == "taken_over"}:
 	default:
 		c.cancel()
 		_ = c.socket.Close()
@@ -98,6 +129,9 @@ func (a *App) queue(c *connection, v view) {
 
 func (a *App) broadcast(state room) {
 	for c := range a.clients {
-		a.queue(c, state.visibleTo(c.id))
+		control := state.Controls[c.id]
+		if control.PageID == c.pageID && control.Generation == c.generation && a.active[c.id] == c {
+			a.queue(c, state.visibleTo(c.id))
+		}
 	}
 }

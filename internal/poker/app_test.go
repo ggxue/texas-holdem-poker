@@ -2,6 +2,7 @@ package poker
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -22,6 +23,7 @@ type roomView struct {
 	Seats   [2]*playerView `json:"seats"`
 	Bot     playerView     `json:"bot"`
 	Error   string         `json:"error"`
+	Control int64          `json:"control"`
 }
 
 func testServer(t *testing.T) *httptest.Server {
@@ -63,7 +65,8 @@ func getRoom(t *testing.T, client *http.Client, address string) roomView {
 
 func join(t *testing.T, client *http.Client, address, requestID string, version int64) (int, roomView) {
 	t.Helper()
-	data, err := json.Marshal(map[string]any{"requestID": requestID, "version": version, "action": "join"})
+	current := getRoom(t, client, address)
+	data, err := json.Marshal(map[string]any{"requestID": requestID, "version": version, "action": "join", "pageID": pageID(client), "control": current.Control})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,6 +81,8 @@ func join(t *testing.T, client *http.Client, address, requestID string, version 
 	}
 	return response.StatusCode, view
 }
+
+func pageID(c *http.Client) string { return fmt.Sprintf("page-%p", c) }
 
 func TestAC07TwoHumansEnterAndThirdHumanIsRejected(t *testing.T) {
 	server := testServer(t)

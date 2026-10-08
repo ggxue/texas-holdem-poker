@@ -12,6 +12,13 @@ type room struct {
 	Host     string            `json:"host"`
 	Bot      player            `json:"bot"`
 	Hand     *hand
+	Controls map[string]controller
+}
+
+type controller struct {
+	PageID     string
+	Generation int64
+	Seen       map[string]bool
 }
 
 type view struct {
@@ -22,10 +29,12 @@ type view struct {
 	Bot     player     `json:"bot"`
 	Error   string     `json:"error,omitempty"`
 	Hand    *handView  `json:"hand,omitempty"`
+	Control int64      `json:"control"`
 }
 
 func (s room) visibleTo(id string) view {
 	v := view{Version: s.Version, You: id, Host: s.Host, Bot: s.Bot}
+	v.Control = s.Controls[id].Generation
 	if s.Hand != nil {
 		v.Hand = s.Hand.visibleTo(id)
 		if v.Hand.Actor == id { // 只有当前行动者需要实际扣款提示。
