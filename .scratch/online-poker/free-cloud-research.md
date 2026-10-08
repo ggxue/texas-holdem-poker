@@ -1,15 +1,20 @@
 # 免费云部署与 chips 存档研究
 
-- 查阅日期：2026-10-08（Asia/Singapore）；目标上线日期：2026-10-09。
-- 状态：research 完成；推荐为提案，用户尚未选择供应商或接受其限制。
-- 范围：Go + HTML/JS/CSS；单房间，最多两个真人和一个机器人；WebSocket；已提交的 chips 存档必须跨应用重启保留。未注册账号、创建资源或部署。
+- 查阅及 Q27 再核验日期：2026-10-08（Asia/Singapore）；目标上线日期：2026-10-09。
+- 状态：research 完成；Q26 存档/恢复已确认，Q27 用户已选择 Render Free + Neon Free 并接受所列免费限制。账号、资源、部署与实际额度仍待验证。
+- 范围：Go + HTML/JS/CSS；单房间，最多两个真人和一个机器人；WebSocket；按 Q26 保存余额、房间与完整当前牌局，重启读取最后提交状态。未注册账号、创建资源或部署。
 - 方法：仅采用官方文档、定价与更新公告。Neon 页面返回 Markdown，浏览工具解析失败，改用只读 `curl.exe -L` 获取当前官方页面；没有依赖旧额度的记忆或第三方教程。
 
-## 推荐提案
+## 已选方案（Q27 已确认）
 
 **优先 Render Hobby workspace + Free Web Service + Neon Free PostgreSQL。** Go 服务同时提供静态页面和 WebSocket，chips 放在外部 PostgreSQL；不在容器本地保存权威余额。Render 原生支持 Go，也支持 Docker；Neon 支持标准 PostgreSQL 客户端。选择此组合是为了减少明天部署的运维工作量，属于项目判断，并非平台上线保证。[Render 原生运行环境](https://render.com/docs/native-runtimes)、[Neon 定价](https://neon.com/pricing)
 
-该组合是有额度的免费计划，不是无条件持续可用：闲置会冷启动、超额度会停用，平台维护或重新部署会断开连接。用户是否接受这些限制仍需单独确认。[Render Free 限制](https://render.com/docs/free)、[Neon 计划](https://neon.com/docs/introduction/plans)
+该组合是有额度的免费计划，不是无条件持续可用：闲置会冷启动、超额度会停用，平台维护或重新部署会断开连接。用户已在 Q27 接受这些限制。[Render Free 限制](https://render.com/docs/free)、[Neon 计划](https://neon.com/docs/introduction/plans)
+
+Q26 已确认外部 PostgreSQL 共同保存余额与完整牌局、保存失败停止全部状态变更、重启读取最后提交状态。
+现有期限保留；已到期事件可在恢复后立即生效。存档中此前在线者在应用进程恢复后有一次 30 秒连接宽限，
+已经断线者保留旧期限，连接宽限不延长原行动期限。具体决定以[需求记录 Q26](requirements-discussion.md)为准，
+实现依据见[持久化研究](persistence-research.md)；平台及免费限额由后续 Q27 单独确认，不能从 Q26 推定。
 
 ## 主方案的已核实事实
 
@@ -45,7 +50,7 @@
 
 **长期闲置：** 官方分支归档规则是分支创建超过 14 天且过去 24 小时未访问时可归档，访问时自动解除归档；这是移到归档存储，不是删除。没有从已查文档找到与 Render 免费 PostgreSQL 类似的固定 30 天到期删除规则；这也不构成账号永不被停用、数据永不丢失的承诺。[Branch Archiving](https://neon.com/docs/guides/branch-archiving)
 
-**备份边界：** Free 有最多 6 小时的恢复历史，且受变更量限制；短期恢复窗口不能代替独立长期备份。若后续要承诺误删恢复或长期数据保障，需要另行确认导出、保留与恢复要求。[Plans](https://neon.com/docs/introduction/plans#history-window)
+**备份边界：** Free 最多 6 小时恢复历史，官方定价表标注 1 GB 限制；当前 Plans 部分段落写 1 GB 变更历史，另一些写 1 GB-month，单位表述不完全一致。因此不承诺任意写入量下都有完整 6 小时可恢复，应复核实际控制台历史窗口。短期恢复窗口不是独立长期备份；恢复已提交当前状态也不需要把数据库回滚到旧备份。[Pricing](https://neon.com/pricing)、[Plans](https://neon.com/docs/introduction/plans#history-window)
 
 **零费用操作条件：** 只选择 Free，不升级 Launch/Scale，不激活付费产品。Free 达到额度暂停或拒绝写入，保持 Free 不会按付费计划自动补购资源。默认最小计算、缩短空闲数据库连接与避免定时查询可帮助节省额度，具体配置在技术决策和实测后确定。[Pricing](https://neon.com/pricing)、[Plans](https://neon.com/docs/introduction/plans)
 
@@ -68,5 +73,14 @@ Koyeb 虽有 Free web instance，但当前官方 FAQ 说明注册默认 Pro 会�
 - Render 在 2026-02-24 修改了 Free 休眠判定，现在入站 WebSocket 消息也延后休眠；只保持一个无消息的连接不能据此保证不休眠。[变更公告](https://render.com/changelog/free-web-services-now-remain-active-while-receiving-websocket-messages)
 - Render 原生 Go 现在自动跟随稳定版本，官方 language-support 说明精确固定版本要用 Docker；某些旧教程仍提 `GO_VERSION`，不作为固定 SDK 的依据。[Language Support](https://render.com/docs/language-support)、[2026-04-16 更新](https://render.com/changelog/automatic-go-version-updates)
 - 注册与区域实际可用性、用户所在地区可访问性、部署容量、最终控制台额度都尚未实测。优先选择相近的应用/数据库地域，不能只凭用户时区推定访问地点或延迟。尚未创建任何账号。
-- 跨应用重启保留已提交 chips，不等于服务崩溃时自动恢复正在进行的牌局。未结算下注如何持久化、如何避免重复结算、失败时是否拒绝继续行动、重连是否回座，仍要逐项决策。
+- Q26 已决定余额与完整牌局共同提交、失败停止变更及故障恢复时限；Q27 已选择 Render/Neon 并接受免费限制，实际去重、旧进程隔离和恢复仍需实现与验收。[需求记录](requirements-discussion.md)、[持久化研究](persistence-research.md)
 - 明天上线的必要验收应包括：两浏览器实际 WebSocket 对战；应用重启/重部署后原身份余额相同；数据库不可用时没有假成功存档或重复发筹码；新用户冷启动提示合理。上述是建议验收项，具体规则仍由后续 spec 确认。
+
+## Q27 再核验结果
+
+2026-10-08 重新打开 Render 官方 Free、WebSocket、FAQ、Bandwidth、Build Pipeline、Compute Plans，以及用只读请求获取 Neon 官方 Pricing/Plans。
+主组合额度与第一次记录一致，没有发现需要改选方案的官方变动。旧 0.5 GB 信息仍不能覆盖当前 1 GB 文档；实际账号尚未创建，额度须在部署时复核。
+
+Q27 推荐附带的零费用条件：Render 同时选 Hobby workspace 和 `free` 服务、不绑定支付方式，Neon 保持 Free；使用平台免费域名/HTTPS，不新增付费磁盘、付费数据库或套餐。Hobby 无月费、Free 计算仍有独立限制，不能仅看到 workspace 免费就选择付费计算实例。[Render FAQ](https://render.com/docs/faq)、[Render Free](https://render.com/docs/free)、[Neon Pricing](https://neon.com/pricing)
+
+需要用户接受的主要后果：Render 闲置后约一分钟唤醒，维护/重部署可能中断 WebSocket；流量/运行额度耗尽会停服务，构建额度耗尽只阻止新构建；Neon 闲置计算暂停可自动唤醒，但额度耗尽可能一直暂停至下个周期，不能保证总在几秒内恢复。数据仍在不等于游戏仍可继续写入。[Render Free](https://render.com/docs/free)、[Build Pipeline](https://render.com/docs/build-pipeline)、[Neon Plans](https://neon.com/docs/introduction/plans#what-happens-if-i-exceed-my-free-plan-limits)
