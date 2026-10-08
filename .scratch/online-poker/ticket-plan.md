@@ -41,8 +41,8 @@ Approval: approved（用户回答“是”）
 | [11：部署交叠时隔离旧进程](issues/11-process-ownership.md) | [10](issues/10-restart-recovery.md) |
 | [12：免费云上线与整体验收](issues/12-free-cloud-launch.md) | [11](issues/11-process-ownership.md) |
 
-所有票据状态为 ready-for-agent；只有阻塞票据全部 done 才能开始。
-当前可开始的 frontier 是 01，其余按依赖推进；本轮不执行实现、不登记实现 baseline、不标游戏验收通过。
+所有票据发布时为 ready-for-agent；当前状态以各票据为准，只有阻塞票据全部 done 才能开始。
+01 已完成 Go 基线修复，当前 frontier 是 02；其余按依赖推进。游戏验收仍待后续实施。
 
 ## 已确认的 12 项拆分
 
