@@ -51,7 +51,7 @@ async function openPage(width, context) {
 }
 async function state(page) { return JSON.parse(await evaluate(page, 'JSON.stringify(confirmed)')); }
 async function action(page, label) {
-  const selector = `[...document.querySelectorAll('#actions button')].find(button => button.textContent.startsWith(${JSON.stringify(label)}) && !button.disabled)`;
+  const selector = `[...document.querySelectorAll('#actions button, #leave')].find(button => button.textContent.startsWith(${JSON.stringify(label)}) && !button.disabled)`;
   await wait(page, `!!(${selector})`, label);
   const before = (await state(page)).version;
   await evaluate(page, `(${selector}).click()`);
@@ -72,6 +72,18 @@ async function screenshot(page, name) {
   await fs.writeFile(`artifacts/${name}.png`, Buffer.from(picture.data, 'base64'));
 }
 const report = {browser:info.Browser, origin:base, cases:[], errors};
+async function checkLayout(page, mobile) {
+  const boxes = await evaluate(page, "[...document.querySelectorAll('#seats .seat')].map(seat => {const r=seat.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom};})");
+  assert(boxes.length === 6, 'six fixed seats missing');
+  const [one,two,three,four,five,bot] = boxes;
+  if (mobile) {
+    assert(Math.abs(one.y-two.y)<2 && one.x<two.x && Math.abs(three.y-four.y)<2 && three.y>one.y && three.x<four.x && five.y>four.y && bot.y>five.y, 'phone fixed human rows and bottom bot');
+  } else {
+    assert(Math.abs(three.y-four.y)<2 && Math.abs(four.y-five.y)<2 && three.x<four.x && four.x<five.x && one.y>three.y && two.y>five.y && one.x<two.x && bot.y>one.y, 'desktop fixed top humans3/4/5, left1/right2, bottom bot');
+  }
+  assert(await evaluate(page, "document.getElementById('game-info').getBoundingClientRect().bottom <= document.getElementById('seats').getBoundingClientRect().top && document.getElementById('actions').getBoundingClientRect().top >= document.querySelectorAll('#seats .seat')[5].getBoundingClientRect().bottom && document.body.innerText.includes('你的操作') && document.getElementById('retry').getBoundingClientRect().bottom < document.getElementById('seats').getBoundingClientRect().top"), 'top status/connection controls or bottom own actions');
+  assert(await evaluate(page, 'document.documentElement.scrollWidth <= innerWidth'), 'layout horizontal overflow');
+}
 async function observeThinking(page) {
   await wait(page, 'confirmed?.hand?.botThinking', 'robot thinking');
   const start = await state(page);
@@ -92,6 +104,7 @@ try {
   report.cases.push('health probe without room identity');
   const first = await openPage(1280);
   await wait(first, "confirmed?.seats[0]?.id === confirmed?.you && socket?.readyState === WebSocket.OPEN", 'first entry');
+  if (process.argv.includes('--layout')) await checkLayout(first, false);
   await action(first, '开始');
   assert((await state(first)).hand.players.length === 2, 'solo game missing bot');
   assert(await evaluate(first, "document.getElementById('countdown').textContent.includes('当前行动剩余')"), 'action countdown missing');
@@ -116,6 +129,7 @@ try {
   await wait(fourth, "confirmed?.seats[3]?.id === confirmed?.you && socket?.readyState === WebSocket.OPEN", 'fourth entry');
   const fifth = await openPage(390);
   await wait(fifth, "confirmed?.seats[4]?.id === confirmed?.you && socket?.readyState === WebSocket.OPEN", 'fifth entry');
+  if (process.argv.includes('--layout')) { await checkLayout(fourth, false); await checkLayout(fifth, true); report.cases.push('fixed desktop and phone seat positions, top status/connection controls, own actions below bot, empty and full rooms'); }
   for (const entrant of [third, fourth, fifth]) {
     const waiting = await state(entrant);
     assert(!waiting.hand.players.some(player => player.id === waiting.you) && waiting.hand.players.every(player => !player.hole?.length), 'waiting entrant inherited private cards/participation');

@@ -10,15 +10,17 @@
 <body>
   <main>
     <header><span class="eyebrow">TEXAS POKER</span><h1>在线德州扑克</h1></header>
-    <p id="status" role="status" aria-live="polite">正在连接房间…</p>
-    <section class="table" aria-label="牌桌">
-      <div class="table-label">唯一房间 · 最多五名真人</div>
-      <div id="seats" class="seats"></div>
-      <p id="game-info"></p>
-	  <p id="countdown" aria-live="off"></p>
-      <div id="actions" aria-label="游戏操作"></div>
+    <section class="status-bar" aria-label="牌局与连接状态">
+      <div><p id="game-info">等待房主开始</p><p id="countdown" aria-live="off"></p><p id="status" role="status" aria-live="polite">正在连接房间…</p></div>
+      <div class="connection-actions"><button id="leave" type="button" disabled>退出房间</button><button id="retry" type="button">重新连接</button></div>
     </section>
-    <button id="retry" type="button">重新连接</button>
+    <div class="play-layout">
+      <section class="table" aria-label="牌桌">
+        <div class="table-label">唯一房间 · 最多五名真人</div>
+        <div id="seats" class="seats"></div>
+        <section class="action-panel" aria-labelledby="action-title"><h2 id="action-title">你的操作</h2><div id="actions" aria-label="游戏操作"></div></section>
+      </section>
+    </div>
     <p class="hint">断线重新进入后筹码补回 100；服务重启会清空本房间。</p>
   </main>
 </body>
