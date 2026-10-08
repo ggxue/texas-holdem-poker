@@ -6,16 +6,14 @@ const gameInfo = document.getElementById("game-info");
 const actions = document.getElementById("actions");
 const countdown = document.getElementById("countdown");
 const leaveButton = document.getElementById("leave"); // 顶部退出入口保持服务端占座权限。
+const results = document.getElementById("results"); // 结算在独立区域呈现，保留服务器快照。
 let clockOffset = 0;
 let lastServerTime = 0;
 let sending = false;
 let leftRoom = false;
 let takenOver = false;
 const pageID = crypto.randomUUID();
-const ranks = {11: "J", 12: "Q", 13: "K", 14: "A"};
-const suitNames = ["♦", "♣", "♥", "♠"];
 const stageNames = {preflop: "翻牌前", flop: "翻牌", turn: "转牌", river: "河牌", finished: "本局结束"};
-function cardsText(cards) { return cards.map(card => `${suitNames[card.suit]}${ranks[card.rank] || card.rank}`).join(" "); }
 let confirmed = null;
 let socket = null;
 let reconnectTimer = null;
@@ -89,8 +87,6 @@ function render(view) {
         if (player.id === "bot" && view.hand.botThinking) labels.push("思考中"); // 保留真实等待提示。
         appendCards(hole, participant.hole || [], 2, !participant.hole?.length); // 有参赛资格才画两张公开牌面或无数据牌背。
         investment.textContent = `本局投入 ${participant.invested} chips`; // 本局投入由服务端确认。
-        if (participant.strength) labels.push(`${participant.strength.category}：${cardsText(participant.strength.cards)}`); // 结果票前仍保留公开结果。
-        if (view.hand.stage === "finished") labels.push(`获得 ${participant.won} · 结算余额 ${participant.balance}`); // 不自行重新派奖。
       } else { // 没有本局资格不显示已发手牌。
         labels.push(view.hand && view.hand.stage !== "finished" ? "等待下一局" : "准备开局"); // 空闲成员与待局者分别提示。
       }
@@ -136,6 +132,55 @@ function render(view) {
     actions.append(waiting); // 留住清楚的操作入口。
   }
   updateCountdown();
+  renderResults(view); // 只在确认结算后展示结果，新局替换旧结果。
+}
+function renderResults(view) { // 呈现已裁剪奖项，不在客户端比牌或计算分池。
+  results.replaceChildren(); // 当前手局状态决定唯一结果区域。
+  results.hidden = view.hand?.stage !== "finished"; // 未结算以及新局不保留上一局面板。
+  if (results.hidden) return; // 不提前推断结果或获胜者。
+  const heading = document.createElement("h2"); // 结果直接位于操作区域之后。
+  heading.textContent = "本局结果"; // 清楚区分当前可用筹码和结算。
+  const hint = document.createElement("p"); // 解释重连设100与历史快照的关系。
+  hint.className = "result-hint"; // 避免用余额变化改写奖项。
+  hint.textContent = "结算余额为本局快照；当前可用筹码见座位。结果保留至下一局开始。"; // 不增加持久化保证。
+  const list = document.createElement("div"); // 参赛名单来自本局固定身份。
+  list.className = "result-list"; // 多人结果在手机纵向展示。
+  for (const participant of view.hand.players) { // 中途占座者不会继承旧身份结果。
+    const row = document.createElement("article"); // 每名参赛者有独立结果。
+    row.className = "result-player" + (participant.won > 0 ? " winner" : ""); // 仅服务端确认的正奖项突出为赢家。
+    const name = document.createElement("h3"); // 固定本局座位名称，不按当前座位占用者重命名。
+    name.textContent = `${participant.id === "bot" ? "机器人" : `真人 ${participant.seat + 1}`}${participant.id === view.you ? " · 你" : ""}${participant.won > 0 ? " · 赢家" : ""}`; // 本人和赢家同时可辨认。
+    const gain = document.createElement("strong"); // 奖项是已确认金额，不计算余额差。
+    gain.className = "result-gain"; // 强调赢家获得的chips。
+    gain.textContent = `获得 ${participant.won} chips`; // 保留所有参赛者所得，包括零。
+    const wallet = document.createElement("p"); // 投入与结算余额均使用本局快照。
+    wallet.textContent = `本局投入 ${participant.invested} chips · 结算余额 ${participant.balance} chips`; // 接管设100不会修改此处历史余额。
+    row.append(name, gain, wallet); // 先展示姓名、奖项和投入／余额。
+    if (participant.hole?.length) { // 只展示当前身份确有权限查看的手牌。
+      const hole = document.createElement("div"); // 本人或有效摊牌者的确认手牌。
+      hole.className = "result-cards"; // 与桌面牌面共用呈现。
+      hole.setAttribute("aria-label", "手牌"); // 明确与Best Five的区别。
+      appendCards(hole, participant.hole); // 不添加其他玩家暗牌。
+      row.append(hole); // 提前胜出也只显示本人的允许范围。
+    } else { // 不公开的手牌不伪造或重新推算。
+      const concealed = document.createElement("p"); // 说明未公开原因的可见状态。
+      concealed.textContent = "手牌未公开"; // 不是页面隐藏一副完整牌。
+      row.append(concealed); // 保持结果隐私。
+    }
+    const strength = document.createElement("p"); // 牌型必须来自服务端公开结果。
+    if (participant.strength) { // 只有有效摊牌者有Best Five。
+      strength.textContent = `${participant.strength.category} · Best Five`; // 使用既有中文牌型术语。
+      const best = document.createElement("div"); // 五张最佳牌单独排列。
+      best.className = "result-cards best-five"; // 手机也保持可读。
+      appendCards(best, participant.strength.cards); // 不从手牌再执行比牌算法。
+      row.append(strength, best); // 明确区分手牌和最佳五张。
+    } else { // 提前胜出不强制计算或亮牌，弃牌不公开牌型。
+      strength.textContent = participant.folded ? "弃牌 · 无领奖资格" : "提前胜出 · 未强制亮牌"; // 状态来自确认资格。
+      row.append(strength); // 不制造不可见的牌型。
+    }
+    list.append(row); // 保留所有原参赛者，即使已经离房。
+  }
+  results.append(heading, hint, list); // 历史快照直到下一局开始才替换。
 }
 function updateCountdown() {
   if (!confirmed || takenOver || leftRoom) { countdown.textContent = ""; return; }

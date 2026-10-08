@@ -93,3 +93,18 @@ button:focus-visible { outline: 3px solid white; outline-offset: 4px; }
   .reference-cards { margin: 0; }
   .board .playing-card { width: 50px; height: 70px; }
 }
+.results-panel { margin: 20px auto 0; padding: 20px; max-width: 680px; border: 1px solid #486659; border-radius: 14px; background: #102923; }
+.results-panel h2 { color: #e0bf80; }
+.result-hint { font-size: 13px; line-height: 1.7; color: #b4d8c8; }
+.result-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.result-player { min-width: 0; padding: 14px; background: #16372c; border: 1px solid #486659; border-radius: 10px; }
+.result-player.winner { border: 2px solid #e0bf80; background: #2b3e2a; }
+.result-player h3 { margin: 0 0 8px; font-size: 16px; }
+.result-gain { font-size: 16px; color: #b4d8c8; }
+.winner .result-gain { font-size: 21px; color: #e0bf80; }
+.result-player p { font-size: 13px; line-height: 1.7; margin: 10px 0; color: #c1cdc5; }
+.result-cards { display: flex; gap: 5px; margin: 10px 0; }
+@media (max-width: 1100px) {
+  .results-panel { padding: 16px; }
+  .result-list { grid-template-columns: minmax(0, 1fr); }
+}

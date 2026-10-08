@@ -95,6 +95,20 @@ async function checkCards(page, mobile) {
     await evaluate(page, "document.querySelector('.hand-reference summary').click()");
   } else assert(await evaluate(page, "document.querySelector('.hand-reference').getBoundingClientRect().right <= document.querySelector('.table').getBoundingClientRect().left"), 'desktop reference must stay left');
 }
+async function checkResults(page, early = false) {
+  const v = await state(page);
+  assert(v.hand.stage === 'finished', 'result requires confirmed settlement');
+  assert(await evaluate(page, "document.getElementById('results') && !document.getElementById('results').hidden && document.getElementById('results').getBoundingClientRect().top >= document.getElementById('actions').getBoundingClientRect().bottom"), 'independent results must be below own actions');
+  const text = await evaluate(page, "document.getElementById('results').innerText");
+  for (const player of v.hand.players) {
+    const name = player.id === 'bot' ? '机器人' : `真人 ${player.seat+1}`;
+    assert(text.includes(name) && text.includes(`本局投入 ${player.invested} chips`) && text.includes(`结算余额 ${player.balance} chips`), 'settlement snapshot fields missing');
+    if (player.won > 0) assert(text.includes(`获得 ${player.won} chips`) && text.includes('赢家'), 'winner/gain not prominent');
+  }
+  if (early) assert(!text.includes('Best Five') && text.includes('未强制亮牌'), 'early win forced a hand strength');
+  else assert(text.includes('Best Five'), 'showdown best five missing');
+  assert(await evaluate(page, 'document.documentElement.scrollWidth <= innerWidth'), 'results horizontal overflow');
+}
 async function observeThinking(page) {
   await wait(page, 'confirmed?.hand?.botThinking', 'robot thinking');
   const start = await state(page);
@@ -135,10 +149,12 @@ try {
     }
   }
   await wait(first, "confirmed?.hand?.stage === 'finished'", 'solo settlement after bot');
+  if (process.argv.includes('--results')) await checkResults(first);
   assert((await state(first)).hand.stage === 'finished', 'solo did not settle');
   report.cases.push('one human + bot, mid-hand waiting entrant, four check streets and result');
   if (process.argv.includes('--cards')) report.cases.push('ten reference categories, phone expand/collapse, native card faces/backs, waiting privacy, 0/3/4/5 board progression and chips');
   await action(first, '开始');
+  if (process.argv.includes('--results')) assert(await evaluate(first, "document.getElementById('results').hidden"), 'next hand did not replace old results');
   assert((await state(first)).hand.players.length === 3, 'next hand did not include second human');
   const third = await openPage(390);
   await wait(third, "confirmed?.seats[2]?.id === confirmed?.you && socket?.readyState === WebSocket.OPEN", 'third entry');
@@ -165,6 +181,7 @@ try {
   await action(caller, '跟注');
   for (let i = 0; i < 6; i++) await action(await currentHuman([first, second]), '过牌');
   await wait(first, "confirmed?.hand?.stage === 'finished'", 'two human settlement after bot');
+  if (process.argv.includes('--results')) { await checkResults(first); await checkResults(second); }
   assert((await state(first)).hand.stage === 'finished', 'three player game did not settle');
   await screenshot(first, 'poker-desktop');
   await screenshot(second, 'poker-mobile');
@@ -175,9 +192,26 @@ try {
   await wait(first, "document.getElementById('status').textContent.includes('已在其他页面打开') && takenOver", 'old page takeover');
   const after = await state(replacement);
   assert(after.you === before.you && after.seats[0].chips === 100 && after.hand.id === before.hand.id, 'takeover changed identity/hand or did not reset100');
+  if (process.argv.includes('--results')) { assert(JSON.stringify(after.hand.players.map(p=>[p.won,p.balance]))===JSON.stringify(before.hand.players.map(p=>[p.won,p.balance])), 'takeover rewrote historical awards'); await checkResults(replacement); }
   await send('Target.closeTarget', {targetId:first.target});
   await action(replacement, '开始');
   assert((await state(replacement)).hand.players.length === 6, 'five humans + fixed bot did not start');
+  if (process.argv.includes('--full-hand')) {
+    const fullStart = await state(replacement);
+    for (let i = 0; i < 20; i++) await action(await currentHuman([replacement,second,third,fourth,fifth]), '过牌');
+    await wait(replacement, "confirmed?.hand?.stage === 'finished'", 'full six-player showdown');
+    await checkResults(replacement); await checkResults(fifth);
+    if (process.argv.includes('--tie-six')) {
+      const full = await state(replacement);
+      assert(full.hand.players.every(player=>player.won===1 && player.strength.category==='同花大顺' && player.balance === (player.id === 'bot' ? fullStart.bot.chips : fullStart.seats[player.seat].chips)+1), 'six-way royal board should split six chips as one each');
+      assert(await evaluate(replacement, "document.querySelectorAll('#results .winner').length === 6"), 'six winners not all highlighted');
+      assert(await evaluate(fifth, "document.querySelectorAll('#results .winner').length === 6"), 'phone missing tied winners');
+    }
+    await screenshot(replacement, 'poker-full-results-desktop');
+    await screenshot(fifth, 'poker-full-results-mobile');
+    report.cases.push('five humans + bot full four-street showdown, desktop and phone multi-winner results and next hand');
+    await action(replacement, '开始');
+  }
   for (let i = 0; i < 5; i++) {
     const actor = await currentHuman([replacement, second, third, fourth, fifth]);
     const actorState = await state(actor);
@@ -186,6 +220,7 @@ try {
     await action(actor, '弃牌');
   }
   assert((await state(second)).hand.stage === 'finished', 'fold game not finished');
+  if (process.argv.includes('--results')) { await checkResults(second, true); assert(await evaluate(second, "document.querySelectorAll('#results .card-face').length === 2"), 'early win leaked others holes or concealed own allowed hole'); report.cases.push('separate results below actions, winners/gains, Best Five, historical balance after takeover100, result replacement and early-win privacy'); }
   report.cases.push('same-cookie takeover, old page stopped reconnect, old close harmless, manual next hand/fold');
   await action(replacement, '退出');
   await wait(second, 'confirmed.host === confirmed.you', 'host transfer');
@@ -199,7 +234,7 @@ try {
   report.cases.push('five humans + bot manual next hand/fold, seat reuse and host transfer by entry order');
   assert(errors.length === 0, 'uncaught browser errors');
   report.passed = true;
-  await fs.writeFile('artifacts/browser-report.json', JSON.stringify(report, null, 2));
+  await fs.writeFile(process.argv.includes('--tie-six') ? 'artifacts/browser-tie-report.json' : 'artifacts/browser-report.json', JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report));
 } finally {
   for (const context of contexts) await send('Target.disposeBrowserContext', {browserContextId:context});
