@@ -33,6 +33,21 @@ func socketView(t *testing.T, ws *websocket.Conn, version int64) gameView {
 		if e != nil {
 			t.Fatal(e)
 		}
+		var raw map[string]json.RawMessage
+		if e = json.Unmarshal(data, &raw); e != nil {
+			t.Fatal(e)
+		}
+		if handData, ok := raw["hand"]; ok && string(handData) != "null" {
+			var fields map[string]json.RawMessage
+			if e = json.Unmarshal(handData, &fields); e != nil {
+				t.Fatal(e)
+			}
+			for _, key := range []string{"deck", "cursor"} {
+				if _, exists := fields[key]; exists {
+					t.Fatalf("private field %s leaked in actual message", key)
+				}
+			}
+		}
 		var v gameView
 		if e = json.Unmarshal(data, &v); e != nil {
 			t.Fatal(e)
@@ -64,10 +79,6 @@ func TestAC31SocketViewsHideOpponentsAndDeck(t *testing.T) {
 			if len(p.Hole) != want || p.Strength != nil {
 				t.Fatalf("socket %d leaked seat %d: %+v", i, seat, p)
 			}
-		}
-		data, _ := json.Marshal(state)
-		if strings.Contains(string(data), "deck") || strings.Contains(string(data), "cursor") {
-			t.Fatal("deck leaked")
 		}
 	}
 }

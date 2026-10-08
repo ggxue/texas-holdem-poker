@@ -62,6 +62,10 @@ function render(view) {
   });
   const hand = view.hand;
   gameInfo.textContent = hand ? `${stageNames[hand.stage]} · 底池 ${hand.pot} · 公共牌 ${cardsText(hand.board) || "尚未发牌"}` : "等待房主开始 · 每人底注 1";
+  if (hand?.actor) {
+    const actor = hand.players.find(player => player.id === hand.actor);
+    gameInfo.textContent += ` · 当前行动：${actor?.seat === 2 ? "机器人" : `真人 ${(actor?.seat ?? 0) + 1}`}`;
+  }
   actions.replaceChildren();
   if (view.host === view.you && (!hand || hand.stage === "finished")) addAction("start", "开始新一局");
   for (const action of hand?.legal || []) addAction(action, {check: "过牌"}[action] || action);

@@ -33,7 +33,15 @@ Primary acceptance cases: AC01–AC06、AC08、AC13、AC22
 
 Implementation baseline: 31a11cdd2a17c76741a9fde2f908b91732d49dc8。
 
-尚未实施，本次发布不构成游戏验收通过。
+实现及自动化检查已完成；电脑/手机实际浏览器操作仍待12整体验收，不将本票标done。
+
+- RED：TestAC01RoyalFlush、TestAC01TenCategoriesInOrder分别因牌型缺失失败；TestAC08And13因start未支持返回400失败。
+- GREEN：scripts/test-go.ps1 -Package ./internal/poker -Run 'TestAC(01|02|03|04|05|08|09|22|31Socket)'，退出0；覆盖牌型点数/花色/A规则/最佳五张、1/2真人开局、重复请求、四轮过牌、21零头与原始WebSocket权限载荷。
+- SDK gofmt、go vet ./...、go build -o artifacts/build/texas-poker.exe .退出0。Harness验证退出0。全套测试按implement约定留到全部本地实施结束运行。
+- Standards：1项测试载荷断言问题；已改为检查原始消息字段并重跑TestAC31Socket退出0。
+- Spec：同一载荷断言问题及页面未显示当前行动者；均已修复。后续功能不计入03验收。
+- 审查范围：git diff 31a11cd...5787226 -- internal/poker .scratch/online-poker/issues/03-check-to-showdown.md，并复核后续修复。期间出现外部本地提交5787226，保留不改写。
+- 限制：当前无可用浏览器自动化和C编译器；真实电脑/手机验收、race未通过且明确待执行。实现依赖可供04继续，人工/环境验收未冒充通过。
 按[项目验证约定](../../../docs/agents/harness.md)记录命令、退出码、目标 RED/GREEN、
 可复现浏览器/内存行为证据和限制；格式、vet、测试、构建及适用并发检查缺工具或失败不得静默跳过。
 完成前以实施 baseline 和本规格分别审查 Standards/Spec，记录结果；仅验收满足才标 done。
