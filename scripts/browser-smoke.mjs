@@ -8,6 +8,7 @@ let sequence = 0;
 const pending = new Map();
 const errors = [];
 const contexts = [];
+const pausedRequests = new Map();
 socket.addEventListener('message', event => {
   const message = JSON.parse(event.data);
   if (message.id) {
@@ -16,6 +17,7 @@ socket.addEventListener('message', event => {
     clearTimeout(request.timer); pending.delete(message.id);
     if (message.error) request.reject(new Error(JSON.stringify(message.error))); else request.resolve(message.result);
   } else if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails);
+  else if (message.method === 'Fetch.requestPaused') pausedRequests.set(message.sessionId, message.params.requestId);
 });
 function send(method, params = {}, sessionId) {
   const id = ++sequence;
@@ -57,6 +59,26 @@ async function action(page, label) {
   await evaluate(page, `(${selector}).click()`);
   await wait(page, `confirmed.version > ${before} && !sending`, `${label} acknowledged`);
 }
+async function pendingAction(page, label) {
+  await wait(page, "confirmed?.hand?.actor === confirmed?.you && !sending", 'own action before request pause');
+  await send('Fetch.enable', {patterns:[{urlPattern:'*/api/command', requestStage:'Request'}]}, page.session);
+  const before = (await state(page)).version;
+  let request;
+  try {
+    await evaluate(page, `[...document.querySelectorAll('#actions button')].find(button=>button.textContent.startsWith(${JSON.stringify(label)})).click()`);
+    const end = Date.now()+12000;
+    while (!pausedRequests.has(page.session) && Date.now()<end) await new Promise(resolve=>setTimeout(resolve,25));
+    request = pausedRequests.get(page.session);
+    assert(request, 'command request did not pause');
+    assert(await evaluate(page, "sending && document.body.innerText.includes('操作结果待确认') && [...document.querySelectorAll('#actions button')].every(button=>button.disabled) && document.getElementById('leave').disabled"), 'pending command must show waiting confirmation and disable controls');
+  } finally {
+    if (request) await send('Fetch.continueRequest', {requestId:request}, page.session);
+    await send('Fetch.disable', {}, page.session);
+    pausedRequests.delete(page.session);
+  }
+  await wait(page, `confirmed.version > ${before} && !sending`, 'paused command acknowledged');
+  report.cases.push('pending real HTTP command visibly awaits confirmation with own actions and exit disabled');
+}
 async function currentHuman(pages) {
   const end = Date.now() + 12000;
   while (Date.now() < end) {
@@ -69,7 +91,8 @@ function assert(condition, message) { if (!condition) throw new Error(message); 
 async function screenshot(page, name) {
   assert(await evaluate(page, 'document.documentElement.scrollWidth <= innerWidth'), 'horizontal overflow');
   const picture = await send('Page.captureScreenshot', {format:'png', captureBeyondViewport:true}, page.session);
-  await fs.writeFile(`artifacts/${name}.png`, Buffer.from(picture.data, 'base64'));
+  const output = process.argv.includes('--tie-six') ? name.replace(/^poker-/, 'poker-tie-') : name;
+  await fs.writeFile(`artifacts/${output}.png`, Buffer.from(picture.data, 'base64'));
 }
 const report = {browser:info.Browser, origin:base, cases:[], errors};
 async function checkLayout(page, mobile) {
@@ -118,6 +141,11 @@ async function observeThinking(page) {
   const refreshed = await state(page);
   assert(refreshed.hand.turn === start.hand.turn && refreshed.hand.deadline === start.hand.deadline, 'query reset thinking display');
   await screenshot(page, 'poker-thinking');
+  if (process.argv.includes('--tie-six')) {
+    await wait(page, "confirmed.hand.botThinking && /剩余 2[78] 秒/.test(document.getElementById('countdown').textContent)", 'real thirty-second countdown after two seconds');
+    assert((await state(page)).hand.turn === start.hand.turn, 'display countdown accelerated bot action');
+    await screenshot(page, 'poker-thinking-elapsed');
+  }
   await wait(page, `confirmed.hand.turn !== ${start.hand.turn}`, 'actual robot action');
   const next = await state(page);
   const remaining = next.hand.deadline - next.serverTime;
@@ -141,7 +169,8 @@ try {
   if (process.argv.includes('--cards')) { await checkCards(second, true); assert(await evaluate(second, "document.querySelectorAll('.seat.mine .playing-card').length === 0"), 'waiting entrant must not have dealt cards'); }
   assert(!waiting.hand.players.some(player => player.id === waiting.you), 'mid-hand entrant was dealt');
   for (let i = 0; i < 4; i++) {
-    await action(first, '过牌');
+    if (i === 0 && process.argv.includes('--pending')) await pendingAction(first, '过牌');
+    else await action(first, '过牌');
     if (i === 0) await observeThinking(first);
     if (process.argv.includes('--cards')) {
       await wait(first, `document.querySelectorAll('.board .card-face').length === ${[3,4,5,5][i]}`, 'revealed board slots');

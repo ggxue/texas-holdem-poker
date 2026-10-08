@@ -7,6 +7,7 @@ const actions = document.getElementById("actions");
 const countdown = document.getElementById("countdown");
 const leaveButton = document.getElementById("leave"); // 顶部退出入口保持服务端占座权限。
 const results = document.getElementById("results"); // 结算在独立区域呈现，保留服务器快照。
+const commandStatus = document.getElementById("command-status"); // 提交确认与连接状态分开，避免覆盖故障信息。
 let clockOffset = 0;
 let lastServerTime = 0;
 let sending = false;
@@ -39,6 +40,8 @@ const messages = {
   chips_overflow: "筹码数值超出可表示范围，此操作没有生效。",
 };
 function render(view) {
+  commandStatus.hidden = !sending || takenOver; // 只有未被接管的待响应命令显示提交提示。
+  commandStatus.textContent = sending ? "操作结果待确认…" : ""; // 按钮禁用时仍有明确确认状态。
   if (view.error === "taken_over") {
     takenOver = true;
     clearTimeout(reconnectTimer);
@@ -46,6 +49,7 @@ function render(view) {
     actions.replaceChildren();
     retryButton.disabled = true;
     leaveButton.disabled = true; // 旧控制页不能通过顶部入口继续操作。
+    commandStatus.hidden = true; // 接管提示替代旧命令的等待状态。
     statusLine.textContent = messages.taken_over;
     return;
   }

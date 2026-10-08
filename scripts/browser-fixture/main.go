@@ -17,7 +17,7 @@ func main() {
 			return seats[len(seats)-1], nil // 候选最后一席是固定机器人。
 		},
 		BotThinkSeconds: func() (int, error) { // 验收等待仍遵守一到八秒范围。
-			return 1, nil // 加速本机浏览器流程，仍实际等待一秒。
+			return 3, nil // 固定三秒供页面正常30秒递减的组合验收。
 		},
 	})
 	if err != nil { // 构造失败必须退出，不能冒充验收服务。
