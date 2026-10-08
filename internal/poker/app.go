@@ -20,10 +20,17 @@ type App struct {
 	closed   bool
 	deck     func() ([]Card, error)
 	active   map[string]*connection
+	clock    Clock
+	timer    Timer
+	wake     *int
+	fault    string
 }
 
 // Options supplies an offline deterministic deck seam; HTTP never accepts cards.
-type Options struct{ Deck func() ([]Card, error) }
+type Options struct {
+	Deck  func() ([]Card, error)
+	Clock Clock
+}
 
 func New() (*App, error) { return NewWithOptions(Options{}) }
 
@@ -36,7 +43,11 @@ func NewWithOptions(options Options) (*App, error) {
 	if deck == nil {
 		deck = shuffledDeck
 	}
-	return &App{state: room{Accounts: map[string]player{}, Bot: player{ID: "bot", Chips: 100}, Controls: map[string]controller{}}, requests: map[string]receipt{}, secret: secret, clients: map[*connection]struct{}{}, active: map[string]*connection{}, deck: deck}, nil
+	clock := options.Clock
+	if clock == nil {
+		clock = systemClock{}
+	}
+	return &App{state: room{Accounts: map[string]player{}, Bot: player{ID: "bot", Chips: 100}, Controls: map[string]controller{}, Disconnected: map[string]time.Time{}, Connecting: map[string]time.Time{}}, requests: map[string]receipt{}, secret: secret, clients: map[*connection]struct{}{}, active: map[string]*connection{}, deck: deck, clock: clock}, nil
 }
 
 func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -56,7 +67,8 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			setIdentity(w, r, credential)
 		}
 		a.mu.Lock()
-		v := a.state.visibleTo(id)
+		a.tickLocked()
+		v := a.visibleTo(id)
 		if a.closed {
 			v.Error = "unavailable"
 		}
@@ -91,7 +103,8 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		a.mu.Lock()
-		if a.closed {
+		a.tickLocked()
+		if a.closed || a.fault != "" {
 			a.mu.Unlock()
 			writeJSON(w, 503, view{Error: "unavailable"})
 			return
@@ -111,6 +124,9 @@ func (a *App) Close() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.closed = true
+	if a.timer != nil {
+		a.timer.Stop()
+	}
 	for c := range a.clients {
 		c.cancel()
 		_ = c.socket.Close()

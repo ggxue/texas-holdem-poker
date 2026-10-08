@@ -1,18 +1,24 @@
 package poker
 
+import "time"
+
 type player struct {
-	ID    string `json:"id"`
-	Chips int64  `json:"chips"`
+	ID                string `json:"id"`
+	Chips             int64  `json:"chips"`
+	DisconnectedUntil int64  `json:"disconnectedUntil,omitempty"`
+	ConnectingUntil   int64  `json:"connectingUntil,omitempty"`
 }
 
 type room struct {
-	Version  int64             `json:"version"`
-	Accounts map[string]player `json:"accounts"`
-	Seats    [2]string         `json:"seats"`
-	Host     string            `json:"host"`
-	Bot      player            `json:"bot"`
-	Hand     *hand
-	Controls map[string]controller
+	Version      int64             `json:"version"`
+	Accounts     map[string]player `json:"accounts"`
+	Seats        [2]string         `json:"seats"`
+	Host         string            `json:"host"`
+	Bot          player            `json:"bot"`
+	Hand         *hand
+	Controls     map[string]controller
+	Disconnected map[string]time.Time
+	Connecting   map[string]time.Time
 }
 
 type controller struct {
@@ -22,14 +28,15 @@ type controller struct {
 }
 
 type view struct {
-	Version int64      `json:"version"`
-	You     string     `json:"you"`
-	Host    string     `json:"host"`
-	Seats   [2]*player `json:"seats"`
-	Bot     player     `json:"bot"`
-	Error   string     `json:"error,omitempty"`
-	Hand    *handView  `json:"hand,omitempty"`
-	Control int64      `json:"control"`
+	Version    int64      `json:"version"`
+	You        string     `json:"you"`
+	Host       string     `json:"host"`
+	Seats      [2]*player `json:"seats"`
+	Bot        player     `json:"bot"`
+	Error      string     `json:"error,omitempty"`
+	Hand       *handView  `json:"hand,omitempty"`
+	Control    int64      `json:"control"`
+	ServerTime int64      `json:"serverTime"`
 }
 
 func (s room) visibleTo(id string) view {
@@ -46,6 +53,12 @@ func (s room) visibleTo(id string) view {
 	for i, occupant := range s.Seats {
 		if occupant != "" {
 			p := s.Accounts[occupant]
+			if deadline := s.Disconnected[occupant]; !deadline.IsZero() {
+				p.DisconnectedUntil = deadline.UnixMilli()
+			}
+			if deadline := s.Connecting[occupant]; !deadline.IsZero() {
+				p.ConnectingUntil = deadline.UnixMilli()
+			}
 			v.Seats[i] = &p
 		}
 	}
@@ -56,6 +69,14 @@ func (s room) visibleTo(id string) view {
 func (s room) clone() room {
 	c := s
 	c.Accounts = make(map[string]player, len(s.Accounts))
+	c.Disconnected = make(map[string]time.Time, len(s.Disconnected))
+	c.Connecting = make(map[string]time.Time, len(s.Connecting))
+	for id, deadline := range s.Connecting {
+		c.Connecting[id] = deadline
+	}
+	for id, deadline := range s.Disconnected {
+		c.Disconnected[id] = deadline
+	}
 	for id, p := range s.Accounts {
 		c.Accounts[id] = p
 	}

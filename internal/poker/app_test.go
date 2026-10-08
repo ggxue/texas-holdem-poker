@@ -12,8 +12,10 @@ import (
 )
 
 type playerView struct {
-	ID    string `json:"id"`
-	Chips int64  `json:"chips"`
+	ID                string `json:"id"`
+	Chips             int64  `json:"chips"`
+	DisconnectedUntil int64  `json:"disconnectedUntil"`
+	ConnectingUntil   int64  `json:"connectingUntil"`
 }
 
 type roomView struct {
@@ -79,7 +81,11 @@ func join(t *testing.T, client *http.Client, address, requestID string, version 
 	if err := json.NewDecoder(response.Body).Decode(&view); err != nil {
 		t.Fatal(err)
 	}
+	if response.StatusCode == http.StatusOK {
+		gameSocket(t, client, address)
+	}
 	return response.StatusCode, view
+
 }
 
 func pageID(c *http.Client) string { return fmt.Sprintf("page-%p", c) }

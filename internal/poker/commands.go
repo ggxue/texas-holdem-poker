@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"math"
 	"net/http"
+	"time"
 )
 
 type command struct {
@@ -31,7 +32,7 @@ type receipt struct {
 func (a *App) apply(id string, cmd command) (outcome, bool) {
 	control := a.state.Controls[id]
 	if (control.Seen[cmd.PageID] && control.PageID != cmd.PageID) || (cmd.Action != "join" && (control.PageID != cmd.PageID || control.Generation != cmd.Control)) {
-		v := a.state.visibleTo(id)
+		v := a.visibleTo(id)
 		v.Error = "taken_over"
 		return outcome{http.StatusConflict, v}, false
 	}
@@ -40,7 +41,7 @@ func (a *App) apply(id string, cmd command) (outcome, bool) {
 	key := id + ":" + cmd.RequestID
 	if saved, ok := a.requests[key]; ok {
 		if saved.Hash != hash {
-			v := a.state.visibleTo(id)
+			v := a.visibleTo(id)
 			v.Error = "request_conflict"
 			return outcome{http.StatusConflict, v}, false
 		}
@@ -96,6 +97,15 @@ func (a *App) apply(id string, cmd command) (outcome, bool) {
 		control.PageID = cmd.PageID
 		control.Generation++
 		a.state.Controls[id] = control
+		deadline := a.state.Disconnected[id]                                                                         // 重连握手前仍沿用原离房期限。
+		if pending := a.state.Connecting[id]; !pending.IsZero() && (deadline.IsZero() || pending.Before(deadline)) { // 已在握手阶段的重试也不能延长期限。
+			deadline = pending // 保留两种现有期限中更早的一项。
+		}
+		if deadline.IsZero() { // 新页没有普通断线期限时建立握手期限。
+			deadline = a.clock.Now().Add(30 * time.Second) // 不能让未建立连接的页面永久占座。
+		}
+		a.state.Connecting[id] = deadline // 等有效WebSocket建立后才解除等待。
+		delete(a.state.Disconnected, id)  // 接管本身不制造普通断线状态。
 		for c := range a.clients {
 			if c.id == id && c.generation != control.Generation {
 				a.queue(c, view{Error: "taken_over"})
@@ -103,7 +113,11 @@ func (a *App) apply(id string, cmd command) (outcome, bool) {
 		}
 		delete(a.active, id)
 	}
-	result.View = a.state.visibleTo(id)
+	if rejection == "" {
+		a.ensureDeadline()
+		a.scheduleLocked()
+	}
+	result.View = a.visibleTo(id)
 	if rejection != "" {
 		result.Status = http.StatusConflict
 		result.View.Error = rejection

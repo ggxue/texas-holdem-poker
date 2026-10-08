@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"math"
 	"math/big"
+	"time"
 )
 
 type participant struct {
@@ -20,17 +21,19 @@ type participant struct {
 	acted    bool
 }
 type hand struct {
-	ID       int64
-	Turn     int64
-	Stage    string
-	Pot      int64
-	Board    []Card
-	Players  []participant
-	Actor    int
-	Target   int64
-	deck     []Card
-	cursor   int
-	showdown bool
+	ID           int64
+	Turn         int64
+	Stage        string
+	Pot          int64
+	Board        []Card
+	Players      []participant
+	Actor        int
+	Target       int64
+	deck         []Card
+	cursor       int
+	showdown     bool
+	Deadline     time.Time
+	deadlineTurn int64
 }
 type handView struct {
 	ID         int64         `json:"id"`
@@ -44,6 +47,7 @@ type handView struct {
 	Legal      []string      `json:"legal"`
 	CallAmount int64         `json:"callAmount"`
 	BetAmount  int64         `json:"betAmount"`
+	Deadline   int64         `json:"deadline"`
 }
 
 func validAction(action string) bool {
@@ -70,7 +74,10 @@ func shuffledDeck() ([]Card, error) {
 
 func (h *hand) visibleTo(id string) *handView {
 	v := &handView{ID: h.ID, Turn: h.Turn, Stage: h.Stage, Pot: h.Pot, Board: append([]Card{}, h.Board...), Target: h.Target, Players: make([]participant, len(h.Players))} // 构造独立的公开快照。
-	for i, p := range h.Players {                                                                                                                                           // 按参赛身份裁剪暗牌，座位重用不会转移手牌。
+	if !h.Deadline.IsZero() {                                                                                                                                               // 有有效行动机会时才公开期限。
+		v.Deadline = h.Deadline.UnixMilli() // 使用绝对毫秒时间，重连不会重新计时。
+	}
+	for i, p := range h.Players { // 按参赛身份裁剪暗牌，座位重用不会转移手牌。
 		v.Players[i] = p                             // 复制该参赛者的公开字段。
 		v.Players[i].Hole = nil                      // 默认隐藏手牌。
 		v.Players[i].Strength = nil                  // 默认隐藏牌力。
@@ -113,6 +120,9 @@ func (a *App) gameCommand(id string, cmd command) string {
 		return s.depart(id) // 立即释放座位并失去未结算资格。
 	}
 	if cmd.Action == "start" { // 房主手动开局。
+		if len(s.Disconnected) > 0 || len(s.Connecting) > 0 { // 有断线或尚未建立控制连接者时不能开新局。
+			return "connection_grace" // 避免对离线玩家补给或扣底注。
+		}
 		if s.Host != id { // 核对请求身份是否为房主。
 			return "host_only" // 拒绝非房主开局。
 		} // 非房主不能开局。
@@ -378,7 +388,7 @@ func (s *room) act(action string) string {
 	return ""                                  // 同一内存变更统一生效。
 }
 
-func (s *room) depart(id string) string {
+func (s *room) release(id string) string {
 	seat := -1                         // 查找该身份当前占用的真人座位。
 	for i, occupant := range s.Seats { // 只释放本人座位。
 		if occupant == id { // 确认身份与座位一致。
@@ -389,8 +399,10 @@ func (s *room) depart(id string) string {
 	if seat < 0 { // 未入房身份没有可退出的座位。
 		return "not_in_room" // 退出请求不影响任何其他玩家。
 	}
-	s.Seats[seat] = "" // 立即释放座位，剩余余额仍绑定原身份。
-	if s.Host == id {  // 房主离开后自动交接。
+	delete(s.Disconnected, id) // 清除已经确认离房的宽限期限。
+	delete(s.Connecting, id)   // 清除未建立控制连接的期限。
+	s.Seats[seat] = ""         // 立即释放座位，剩余余额仍绑定原身份。
+	if s.Host == id {          // 房主离开后自动交接。
 		s.Host = ""                        // 默认无真人时没有房主。
 		for _, occupant := range s.Seats { // 最多只剩一名真人，保持其原座位。
 			if occupant != "" { // 找到仍在房间的人。
@@ -409,5 +421,15 @@ func (s *room) depart(id string) string {
 			h.Players[i].acted = true  // 不再等待该玩家应答。
 		}
 	}
-	return s.advance() // 必要时跳过空位或提前结算，所有投入不退。
+	return "" // 资格与座位已经更新，统一推进时所有投入不退。
+}
+
+func (s *room) depart(id string) string {
+	if rejection := s.release(id); rejection != "" { // 先释放席位与未结算资格。
+		return rejection // 无座位时报告无效退出。
+	}
+	if s.Hand != nil && s.Hand.Stage != "finished" { // 未结束牌局才继续推进。
+		return s.advance() // 跳过离房玩家，必要时结算。
+	}
+	return "" // 已结算奖项保持不变。
 }

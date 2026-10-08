@@ -3,6 +3,7 @@ package poker
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -32,7 +33,8 @@ func (a *App) serveSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.mu.Lock()
-	if a.closed {
+	a.tickLocked()
+	if a.closed || a.fault != "" {
 		a.mu.Unlock()
 		writeJSON(w, 503, view{Error: "unavailable"})
 		return
@@ -50,6 +52,11 @@ func (a *App) serveSocket(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 403, view{Error: "taken_over"})
 		return
 	}
+	if a.state.Version == math.MaxInt64 {
+		a.mu.Unlock()
+		writeJSON(w, 503, view{Error: "version_exhausted"})
+		return
+	}
 	socket, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		a.mu.Unlock()
@@ -62,10 +69,19 @@ func (a *App) serveSocket(w http.ResponseWriter, r *http.Request) {
 		_ = old.socket.Close()
 	}
 	a.active[id] = c
+	if !a.state.Connecting[id].IsZero() || !a.state.Disconnected[id].IsZero() { // 有效握手才结束连接建立或重连等待。
+		delete(a.state.Connecting, id)   // 清除握手阶段期限。
+		delete(a.state.Disconnected, id) // 清除已观察断线的期限。
+		a.state.Version++                // 连接已建立也是权威状态更新。
+		a.broadcast(a.state)             // 向仍有效的控制页同步恢复。
+		a.scheduleLocked()               // 保留原行动期限，取消失效的连接期限。
+	}
 	a.clients[c] = struct{}{}
-	a.queue(c, a.state.visibleTo(id))
+	a.queue(c, a.visibleTo(id))
 	a.mu.Unlock()
 	socket.SetReadLimit(4096)
+	_ = socket.SetReadDeadline(time.Now().Add(45 * time.Second))
+	socket.SetPongHandler(func(string) error { return socket.SetReadDeadline(time.Now().Add(45 * time.Second)) })
 	writerDone := make(chan struct{})
 	go func() { defer close(writerDone); c.writeLoop() }()
 	defer func() {
@@ -76,6 +92,7 @@ func (a *App) serveSocket(w http.ResponseWriter, r *http.Request) {
 		delete(a.clients, c)
 		if a.active[id] == c {
 			delete(a.active, id)
+			a.disconnectLocked(id, c.pageID, c.generation)
 		}
 		a.mu.Unlock()
 	}()
@@ -93,10 +110,19 @@ func (a *App) serveSocket(w http.ResponseWriter, r *http.Request) {
 func (c *connection) writeLoop() {
 	defer c.cancel()
 	defer c.socket.Close()
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-c.ctx.Done():
 			return
+		case <-ticker.C:
+			if err := c.socket.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+				return
+			}
+			if err := c.socket.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return
+			}
 		case message := <-c.send:
 			if err := c.socket.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
 				return
@@ -131,7 +157,10 @@ func (a *App) broadcast(state room) {
 	for c := range a.clients {
 		control := state.Controls[c.id]
 		if control.PageID == c.pageID && control.Generation == c.generation && a.active[c.id] == c {
-			a.queue(c, state.visibleTo(c.id))
+			v := state.visibleTo(c.id)
+			v.ServerTime = a.clock.Now().UnixMilli()
+			v.Error = a.fault
+			a.queue(c, v)
 		}
 	}
 }

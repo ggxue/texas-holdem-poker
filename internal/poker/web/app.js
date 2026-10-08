@@ -4,6 +4,9 @@ const seats = document.getElementById("seats");
 const retryButton = document.getElementById("retry");
 const gameInfo = document.getElementById("game-info");
 const actions = document.getElementById("actions");
+const countdown = document.getElementById("countdown");
+let clockOffset = 0;
+let lastServerTime = 0;
 let sending = false;
 let leftRoom = false;
 let takenOver = false;
@@ -33,6 +36,8 @@ const messages = {
   invalid_action: "当前不能执行该操作。",
   not_in_room: "你已离开房间，可重新入房。",
   taken_over: "已在其他页面打开，请使用新页面。",
+  connection_grace: "有玩家断线，等待重连或宽限到期后再开局。",
+  chips_overflow: "筹码数值超出可表示范围，此操作没有生效。",
 };
 function render(view) {
   if (view.error === "taken_over") {
@@ -48,6 +53,7 @@ function render(view) {
   if (view.error) { statusLine.textContent = messages[view.error] || "暂时无法完成操作。"; return; }
   if (confirmed && view.you === confirmed.you && view.version < confirmed.version) return;
   confirmed = view;
+  if (view.serverTime > lastServerTime) { lastServerTime = view.serverTime; clockOffset = view.serverTime - Date.now(); }
   seats.replaceChildren();
   [...view.seats, view.bot].forEach((player, i) => {
     const card = document.createElement("article");
@@ -63,6 +69,8 @@ function render(view) {
       const badge = document.createElement("div");
       badge.className = "badge";
       badge.textContent = [player.id === view.you ? "你" : "", player.id === view.host ? "房主" : ""].filter(Boolean).join(" · ");
+      if (player.disconnectedUntil) badge.textContent += " · 断线宽限中";
+      if (player.connectingUntil) badge.textContent += " · 正在建立控制连接";
       card.append(badge);
       const participant = view.hand?.players.find(item => item.id === player.id);
       const detail = document.createElement("p");
@@ -85,13 +93,25 @@ function render(view) {
     gameInfo.textContent += ` · 当前行动：${actor?.seat === 2 ? "机器人" : `真人 ${(actor?.seat ?? 0) + 1}`}`;
   }
   actions.replaceChildren();
-  if (view.host === view.you && (!hand || hand.stage === "finished")) addAction("start", "开始新一局");
+  if (view.host === view.you && (!hand || hand.stage === "finished") && !view.seats.some(player => player?.disconnectedUntil || player?.connectingUntil)) addAction("start", "开始新一局");
   for (const action of hand?.legal || []) {
     const labels = {check: "过牌", fold: "弃牌", bet: `下注 ${hand.betAmount}${hand.betAmount < 10 ? "（不足全押）" : ""}`, call: `跟注 ${hand.callAmount}${hand.callAmount < hand.target ? "（不足全押）" : ""}`};
     addAction(action, labels[action] || action);
   }
   if (view.seats.some(player => player?.id === view.you)) addAction("leave", "退出房间");
+  updateCountdown();
 }
+function updateCountdown() {
+  if (!confirmed || takenOver || leftRoom) { countdown.textContent = ""; return; }
+  const now = Date.now() + clockOffset;
+  const parts = [];
+  if (confirmed.hand?.deadline) parts.push(`当前行动剩余 ${Math.max(0, Math.ceil((confirmed.hand.deadline - now) / 1000))} 秒`);
+  confirmed.seats.forEach((player, seat) => {
+    if (player?.disconnectedUntil) parts.push(`真人 ${seat + 1} 重连宽限 ${Math.max(0, Math.ceil((player.disconnectedUntil - now) / 1000))} 秒`);
+  });
+  countdown.textContent = parts.join(" · ");
+}
+setInterval(updateCountdown, 1000);
 function addAction(action, label) {
   const button = document.createElement("button");
   button.type = "button";

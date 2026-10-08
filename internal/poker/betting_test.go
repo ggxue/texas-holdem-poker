@@ -39,6 +39,10 @@ func do(t *testing.T, c *http.Client, url, id, action string) gameView {
 	if status != 200 {
 		t.Fatalf("%s: %d %+v", action, status, v)
 	}
+	if action == "join" {
+		gameSocket(t, c, url)
+		return gameState(t, c, url)
+	}
 	return v
 }
 func finishChecks(t *testing.T, clients [2]*http.Client, url string) gameView {
