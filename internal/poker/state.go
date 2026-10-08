@@ -28,6 +28,11 @@ func (s room) visibleTo(id string) view {
 	v := view{Version: s.Version, You: id, Host: s.Host, Bot: s.Bot}
 	if s.Hand != nil {
 		v.Hand = s.Hand.visibleTo(id)
+		if v.Hand.Actor == id { // 只有当前行动者需要实际扣款提示。
+			p := s.Hand.Players[s.Hand.Actor]                              // 读取本人本轮投入。
+			v.Hand.CallAmount = min(s.Hand.Target-p.Street, s.balance(id)) // 跟注不足时只扣剩余余额。
+			v.Hand.BetAmount = min(int64(10), s.balance(id))               // 固定十枚下注不足时显示全押金额。
+		}
 	}
 	for i, occupant := range s.Seats {
 		if occupant != "" {

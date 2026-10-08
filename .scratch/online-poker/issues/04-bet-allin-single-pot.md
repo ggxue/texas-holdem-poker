@@ -2,7 +2,7 @@
 
 > 当前覆盖：状态只在单进程内存中；重新入房本人余额设100；原有数据库提交/真实数据库fixture/跨重启持久性条款已撤销，不执行。游戏规则和公开seam沿用修订spec；详见[当前决定](../memory-reset-decision.md)。
 
-Status: ready-for-agent
+Status: in-progress
 Type: implementation
 Spec: [在线德州扑克首版规格](../spec.md)
 Blocked by: [03](03-check-to-showdown.md)
@@ -32,9 +32,16 @@ Primary acceptance cases: AC14–AC21、AC23
 
 ## Validation
 
-Implementation baseline: 待实施开始、任何代码编辑前记录 SHA。
+Implementation baseline: 6e314dff45dd620af1e8af9ef5a0d0cba448cc62。
 
-尚未实施，本次发布不构成游戏验收通过。
+实现和自动化已通过；浏览器/race以及最终全套检查待12，不提前标done。
+
+- RED：TestAC14/16/20/18/17/19因未支持bet/fold返回400、底注未标全押而失败。
+- GREEN：scripts/test-go.ps1 -Package ./internal/poker -Run 'TestAC(14|16|20|18|17|19|08|22)'退出0；TestAC18Lone单独退出0。包括迟到过牌者应答、短下注目标6、28/23单池、机器人Call4、孤人欠注与提前不亮牌。
+- Node24.21.0 --check internal/poker/web/app.js退出0；gofmt及git diff --check退出0。
+- Standards：1项P3逐行注释缺失/过时，已补state.go实际扣款注释并更新四动作描述；Spec：0项实质问题。
+- 审查范围git diff --cached 6e314df --，包含全部本票变更。
+- 已实现下注流程每行中文注释；并发race因尚无C编译器未通过，后续继续解决。真实浏览器操作待整体测试。
 按[项目验证约定](../../../docs/agents/harness.md)记录命令、退出码、目标 RED/GREEN、
 可复现浏览器/内存行为证据和限制；格式、vet、测试、构建及适用并发检查缺工具或失败不得静默跳过。
 完成前以实施 baseline 和本规格分别审查 Standards/Spec，记录结果；仅验收满足才标 done。

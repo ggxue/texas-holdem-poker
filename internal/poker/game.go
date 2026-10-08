@@ -33,19 +33,21 @@ type hand struct {
 	showdown bool
 }
 type handView struct {
-	ID      int64         `json:"id"`
-	Turn    int64         `json:"turn"`
-	Stage   string        `json:"stage"`
-	Pot     int64         `json:"pot"`
-	Board   []Card        `json:"board"`
-	Players []participant `json:"players"`
-	Actor   string        `json:"actor"`
-	Target  int64         `json:"target"`
-	Legal   []string      `json:"legal"`
+	ID         int64         `json:"id"`
+	Turn       int64         `json:"turn"`
+	Stage      string        `json:"stage"`
+	Pot        int64         `json:"pot"`
+	Board      []Card        `json:"board"`
+	Players    []participant `json:"players"`
+	Actor      string        `json:"actor"`
+	Target     int64         `json:"target"`
+	Legal      []string      `json:"legal"`
+	CallAmount int64         `json:"callAmount"`
+	BetAmount  int64         `json:"betAmount"`
 }
 
 func validAction(action string) bool {
-	return action == "join" || action == "start" || action == "check" // 限定本票公开命令范围。
+	return action == "join" || action == "start" || action == "check" || action == "bet" || action == "call" || action == "fold" // 限定本票公开命令范围。
 }
 
 func shuffledDeck() ([]Card, error) {
@@ -83,8 +85,8 @@ func (h *hand) visibleTo(id string) *handView {
 	if h.Stage != "finished" && h.Actor >= 0 { // 只有未结束的牌局存在行动者。
 		v.Actor = h.Players[h.Actor].ID // 公布当前行动身份。
 		if v.Actor == id {              // 仅当前行动者收到合法按钮。
-			v.Legal = []string{"check"} // 本票只允许过牌。
-		} // 本票只交付合法过牌路径。
+			v.Legal = h.legal() // 返回服务器计算的合法动作。
+		} // 只向本人返回当前合法的四动作子集。
 	}
 	return v // 不发送剩余牌序。
 }
@@ -118,8 +120,8 @@ func (a *App) gameCommand(id string, cmd command) string {
 		if err != nil || !validDeck(deck) { // 检查随机源及整副牌的有效性。
 			return "unavailable" // 故障时拒绝开局。
 		} // 发牌前检查完整牌序。
-		h := &hand{ID: s.Version + 1, Stage: "preflop", Actor: 0, deck: append([]Card(nil), deck...)} // 建立新的牌局。
-		for seat, occupant := range s.Seats {                                                         // 固定本局真人名单。
+		h := &hand{ID: s.Version + 1, Stage: "preflop", Actor: -1, deck: append([]Card(nil), deck...)} // 建立新的牌局。
+		for seat, occupant := range s.Seats {                                                          // 固定本局真人名单。
 			if occupant != "" { // 只把已占座的真人列入本局。
 				h.Players = append(h.Players, participant{ID: occupant, Seat: seat}) // 将真人身份固定在本局名单。
 			} // 空位不参加。
@@ -135,13 +137,13 @@ func (a *App) gameCommand(id string, cmd command) string {
 			p := &h.Players[i]                                        // 取得参赛者。
 			s.setBalance(p.ID, s.balance(p.ID)-1)                     // 支付一枚底注。
 			p.Invested = 1                                            // 底注计入总投入，不计入本轮跟注。
+			p.AllIn = s.balance(p.ID) == 0                            // 底注扣完为零即全押。
 			h.Pot++                                                   // 实际扣款进入唯一底池。
 			p.Hole = append([]Card{}, h.deck[h.cursor:h.cursor+2]...) // 发两张唯一的私人手牌。
 			h.cursor += 2                                             // 移动服务端发牌游标。
 		}
-		s.Hand = h // 提交新牌局。
-		h.Turn++   // 首名真人得到新的行动机会。
-		return ""  // 开局成功。
+		s.Hand = h         // 提交新牌局。
+		return s.advance() // 自动选择首名可行动者，必要时补齐牌。
 	}
 	h := s.Hand                            // 读取本局。
 	if h == nil || h.Stage == "finished" { // 检查是否存在未结束的牌局。
@@ -153,11 +155,10 @@ func (a *App) gameCommand(id string, cmd command) string {
 	if h.Actor < 0 || h.Players[h.Actor].ID != id { // 核对当前行动身份。
 		return "not_your_turn" // 拒绝越过行动顺序。
 	} // 只允许当前行动身份操作。
-	if cmd.Action != "check" { // 仅接受本票交付的过牌动作。
-		return "invalid_action" // 拒绝不合法动作。
-	} // 本票仅支持过牌。
-	h.Players[h.Actor].acted = true // 记录当前玩家已过牌。
-	return s.advance()              // 自动执行机器人并推进阶段。
+	if rejection := s.act(cmd.Action); rejection != "" { // 通过统一动作规则校验并执行。
+		return rejection // 动作失败时向调用者报告错误。
+	} // 校验动作后才改变状态。
+	return s.advance() // 自动执行机器人并推进阶段。
 }
 
 func validDeck(deck []Card) bool {
@@ -177,9 +178,36 @@ func validDeck(deck []Card) bool {
 func (s *room) advance() string {
 	h := s.Hand // 取得当前牌局。
 	for {       // 连续处理机器人和无需真人输入的阶段。
-		next := -1                    // 查找固定顺序下尚未行动的玩家。
-		for i, p := range h.Players { // 从真人1到机器人扫描。
-			if !p.Folded && !p.AllIn && !p.acted { // 寻找仍需行动的有效玩家。
+		alive, capable := 0, 0        // 统计领奖资格及下注能力。
+		for _, p := range h.Players { // 统计所有固定参赛者的状态。
+			if !p.Folded { // 未弃牌者仍有领奖资格。
+				alive++       // 增加仍能领奖的人数。
+				if !p.AllIn { // 未全押者仍可能下注。
+					capable++ // 增加能下注的人数。
+				}
+			}
+		} // 全押仍保留领奖资格。
+		if alive == 1 { // 只剩一名未弃牌者时提前结束。
+			return s.settle(false) // 直接分配全池，不强制亮牌。
+		} // 唯一未弃牌者立即赢全池，不强制亮牌。
+		if capable < 2 { // 无足够对手时禁止单独加钱。
+			owing := false                // 判断是否还需回应当前下注。
+			for i, p := range h.Players { // 检查每名玩家的本轮状态。
+				if !p.Folded && !p.AllIn && p.Street < h.Target { // 找到唯一仍欠注的可行动者。
+					h.Players[i].acted = false // 让玩家回应新下注。
+					owing = true               // 记录尚需跟注或弃牌。
+				}
+			} // 唯一欠注者先得到跟注或弃牌机会。
+			if !owing { // 无人欠注时不再提供独自下注。
+				h.deal(5 - len(h.Board)) // 补足五张公共牌，不重复发河牌。
+				return s.settle(true)    // 完成摊牌和单池派奖。
+			} // 无人欠注时补齐五张公共牌。
+		}
+		next := -1                                            // 查找固定顺序下尚未行动的玩家。
+		for offset := 1; offset <= len(h.Players); offset++ { // 固定顺序继续，轮末再回应此前过牌者。
+			i := (h.Actor + offset) % len(h.Players) // 从上一行动者之后开始查找。
+			p := h.Players[i]                        // 读取该位置的本轮状态。
+			if !p.Folded && !p.AllIn && !p.acted {   // 寻找仍需行动的有效玩家。
 				next = i // 保存下一名行动者下标。
 				break    // 找到第一名后停止扫描。
 			} // 跳过弃牌、全押和已完成动作的人。
@@ -190,8 +218,14 @@ func (s *room) advance() string {
 			if h.Players[next].ID != "bot" { // 真人行动需要等待客户端请求。
 				return "" // 本次推进成功，停止自动处理。
 			} // 等待真人请求。
-			h.Players[next].acted = true // 机器人无需跟注时立即过牌。
-			continue                     // 机器人完成后继续推进。
+			action := "check"                      // 机器人默认过牌。
+			if h.Players[next].Street < h.Target { // 机器人欠当前目标时需要跟注。
+				action = "call" // 机器人选择跟注，金额由服务器计算。
+			} // 欠注时只跟注，不分析牌力或随机选择。
+			if rejection := s.act(action); rejection != "" { // 用相同规则立即执行机器人动作。
+				return rejection // 动作失败时向调用者报告错误。
+			} // 立即执行并按余额扣款，不等待动画。
+			continue // 机器人完成后继续推进。
 		}
 		switch h.Stage { // 所有人完成本轮后进入下一阶段。
 		case "preflop": // 翻牌前轮结束后进入翻牌。
@@ -207,6 +241,7 @@ func (s *room) advance() string {
 			return s.settle(true) // 河牌轮结束摊牌。
 		}
 		h.Target = 0               // 新轮没有下注目标。
+		h.Actor = -1               // 新轮从真人1重新扫描，空位跳过。
 		for i := range h.Players { // 依次更新各参赛者。
 			h.Players[i].acted = false // 新轮重新允许玩家行动。
 			h.Players[i].Street = 0    // 清空本轮投入，不改变总投入。
@@ -272,4 +307,67 @@ func (s *room) settle(showdown bool) string {
 	h.Actor = -1          // 已结束不再接受行动。
 	h.showdown = showdown // 仅摊牌才公开有效玩家暗牌。
 	return ""             // 结果保留到下一次开局。
+}
+
+func (h *hand) legal() []string {
+	p := h.Players[h.Actor]  // 读取当前玩家的轮内投入。
+	if p.Folded || p.AllIn { // 已弃牌或全押者不能行动。
+		return nil // 不返回任何合法按钮。
+	} // 已弃牌或全押不能行动。
+	if p.Street < h.Target { // 判断当前玩家是否欠注。
+		return []string{"call", "fold"} // 欠注时只允许跟注或弃牌。
+	} // 欠注时只能跟注或弃牌。
+	actions := []string{"check", "fold"} // 不欠注时允许过牌或弃牌。
+	capable := 0                         // 统计仍能下注的人数。
+	for _, other := range h.Players {    // 统计仍能下注的对手。
+		if !other.Folded && !other.AllIn { // 跳过弃牌和全押的参赛者。
+			capable++ // 增加能下注的人数。
+		}
+	} // 跳过弃牌和全押。
+	if h.Target == 0 && capable >= 2 { // 本轮尚无下注且至少两人有行动能力。
+		actions = append(actions, "bet") // 增加一次固定下注的合法按钮。
+	} // 每轮仅一次下注，禁止独自追加。
+	return actions // 服务器统一决定合法按钮。
+}
+func (s *room) act(action string) string {
+	h := s.Hand                         // 动作只作用于当前牌局。
+	valid := false                      // 默认动作无效。
+	for _, allowed := range h.legal() { // 遍历服务器计算的合法动作。
+		if allowed == action { // 请求动作必须在合法列表内。
+			valid = true // 确认该动作合法。
+		}
+	} // 校验合法动作。
+	if !valid { // 拒绝非法动作后保持原状态。
+		return "invalid_action" // 向页面返回非法动作提示。
+	} // 非法动作不改变状态。
+	p := &h.Players[h.Actor] // 取得当前行动者。
+	amount := int64(0)       // 过牌和弃牌不扣款。
+	if action == "bet" {     // 固定下注需要扣十枚或全部余额。
+		amount = 10 // 设置标准下注金额。
+	} // 首次主动下注固定十枚。
+	if action == "call" { // 跟注只补本轮欠款。
+		amount = h.Target - p.Street // 计算当前欠注，不抵底注。
+	} // 跟注只补本轮差额，底注不抵扣。
+	if amount > s.balance(p.ID) { // 余额不足时不能透支。
+		amount = s.balance(p.ID) // 将实际扣款限制为本人全部余额。
+	} // 不足时扣实际余额全押。
+	if amount > math.MaxInt64-h.Pot || amount > math.MaxInt64-p.Invested { // 投入及底池累加必须能用整数表示。
+		return "chips_overflow" // 拒绝会溢出的扣款。
+	} // 扣款前检查整数累加。
+	if action == "fold" { // 弃牌会失去本局领奖资格。
+		p.Folded = true // 标记玩家已经弃牌。
+	} // 弃牌立即失去领奖资格。
+	if action == "bet" { // 新下注要求此前过牌者重新回应。
+		h.Target = amount          // 短额下注的实际金额成为目标。
+		for i := range h.Players { // 按固定名单更新本轮应答状态。
+			h.Players[i].acted = false // 让玩家回应新下注。
+		} // 其余未弃牌且非全押玩家重新应答。
+	}
+	s.setBalance(p.ID, s.balance(p.ID)-amount) // 从本人余额扣除实际金额。
+	p.Street += amount                         // 累加本轮投入。
+	p.Invested += amount                       // 累加本局投入。
+	h.Pot += amount                            // 全部有效投入进单池，不退款。
+	p.AllIn = p.AllIn || s.balance(p.ID) == 0  // 全押资格不因重连补给而重置。
+	p.acted = true                             // 记录当前机会已经完成。
+	return ""                                  // 同一内存变更统一生效。
 }

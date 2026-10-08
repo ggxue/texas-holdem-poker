@@ -52,6 +52,9 @@ function render(view) {
       const participant = view.hand?.players.find(item => item.id === player.id);
       const detail = document.createElement("p");
       if (participant) {
+        if (participant.folded) badge.textContent += " · 弃牌";
+        else if (participant.allIn) badge.textContent += " · 全押";
+        if (view.hand.actor === player.id) badge.textContent += " · 当前行动";
         detail.textContent = `本局投入 ${participant.invested} · ${participant.hole?.length ? cardsText(participant.hole) : "🂠 🂠"}`;
         if (participant.strength) detail.textContent += ` · ${participant.strength.category}：${cardsText(participant.strength.cards)}`;
         if (view.hand.stage === "finished") detail.textContent += ` · 获得 ${participant.won} · 结算余额 ${participant.balance}`;
@@ -68,7 +71,10 @@ function render(view) {
   }
   actions.replaceChildren();
   if (view.host === view.you && (!hand || hand.stage === "finished")) addAction("start", "开始新一局");
-  for (const action of hand?.legal || []) addAction(action, {check: "过牌"}[action] || action);
+  for (const action of hand?.legal || []) {
+    const labels = {check: "过牌", fold: "弃牌", bet: `下注 ${hand.betAmount}${hand.betAmount < 10 ? "（不足全押）" : ""}`, call: `跟注 ${hand.callAmount}${hand.callAmount < hand.target ? "（不足全押）" : ""}`};
+    addAction(action, labels[action] || action);
+  }
 }
 function addAction(action, label) {
   const button = document.createElement("button");
