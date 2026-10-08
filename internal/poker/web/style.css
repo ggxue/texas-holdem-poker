@@ -1,0 +1,22 @@
+:root { color-scheme: dark; font-family: system-ui, sans-serif; background: #101b1a; color: #eef4ef; }
+* { box-sizing: border-box; }
+body { margin: 0; padding: 24px 16px; }
+main { max-width: 960px; margin: auto; }
+header { margin: 16px 0 24px; }
+.eyebrow { color: #dab877; letter-spacing: .18em; font-size: 12px; }
+h1 { font-size: clamp(26px, 5vw, 40px); margin: 8px 0; }
+#status { min-height: 28px; line-height: 1.6; }
+.table { background: #163e33; border: 6px solid #4b3c2b; border-radius: 32px; padding: 28px; box-shadow: 0 16px 48px #0004; }
+.table-label { text-align: center; color: #b2d2c1; margin-bottom: 24px; }
+.seats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.seat { background: #102923; border: 1px solid #648673; border-radius: 16px; padding: 20px 16px; min-height: 140px; }
+.seat.mine { border: 2px solid #e0bf80; }
+.seat h2 { font-size: 18px; margin: 0 0 16px; }
+.chips { color: #e0bf80; font-size: 24px; font-weight: 700; }
+.badge { font-size: 13px; color: #b4d8c8; margin-top: 12px; }
+.empty { color: #9db3a8; }
+button { margin-top: 24px; min-height: 44px; padding: 10px 20px; border: 0; border-radius: 8px; background: #d9b878; color: #15221b; font: inherit; cursor: pointer; }
+button:disabled { opacity: .5; cursor: wait; }
+button:focus-visible { outline: 3px solid white; outline-offset: 4px; }
+.hint { font-size: 14px; color: #b2beb7; line-height: 1.7; }
+@media (max-width: 600px) { .seats { grid-template-columns: 1fr; } .table { padding: 20px 16px; border-radius: 24px; } .seat { min-height: 110px; } }
