@@ -1,5 +1,7 @@
 # 在线德州扑克：需求讨论记录
 
+> 当前覆盖（2026-10-08）：用户决定不做数据库、筹码只存内存、断线重新入房设100；Q26/Q27和旧AC25已撤销。下方相关问答是历史记录，当前见[memory-reset-decision.md](memory-reset-decision.md)。
+
 Status: discussion-complete
 Mode: grill-with-docs
 

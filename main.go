@@ -12,7 +12,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"texas-poker/internal/poker"
 )
 
@@ -25,23 +24,9 @@ func main() {
 func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		return errors.New("缺少 DATABASE_URL：需要 PostgreSQL 存档连接")
-	}
-	config, err := pgxpool.ParseConfig(dsn)
+	app, err := poker.New()
 	if err != nil {
-		return errors.New("DATABASE_URL 配置无效")
-	}
-	config.MaxConns = 4
-	db, err := pgxpool.NewWithConfig(ctx, config)
-	if err != nil {
-		return errors.New("无法建立存档连接池")
-	}
-	defer db.Close()
-	app, err := poker.New(ctx, db)
-	if err != nil {
-		return fmt.Errorf("初始化房间存档失败: %w", err)
+		return fmt.Errorf("初始化房间失败: %w", err)
 	}
 	defer app.Close()
 	port := os.Getenv("PORT")

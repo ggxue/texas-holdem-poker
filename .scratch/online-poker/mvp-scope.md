@@ -1,5 +1,7 @@
 # 明天最小可玩版本的范围
 
+> 2026-10-08范围更新：数据库、跨重启存档和恢复要求已撤销，改为内存及重新入房设100；本文件保留历史研究/范围，不授权旧存档实施。当前见[memory-reset-decision.md](memory-reset-decision.md)。
+
 Status: scope-agreed
 Target date: 2026-10-09 (Asia/Singapore)
 

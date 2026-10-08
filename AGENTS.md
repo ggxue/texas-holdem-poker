@@ -2,11 +2,13 @@
 
 ## Project and current phase
 
-Go backend for Texas Hold'em. Product scope and game rules are still being shaped.
-`main.go` is the original GoLand starter; there are no game features or tests yet.
-The completed bootstrap task is `.scratch/harness-init/issues/01-initialize.md`.
-The next planning activity is `$wayfinder`, when the user requests it.
-Do not infer game variants, money handling, persistence, or recovery guarantees.
+Go backend and HTML/JS/CSS frontend for a single-room poker game.
+Room entry is implemented; hand gameplay is the next scoped ticket.
+Before game implementation, read [.scratch/online-poker/spec.md](.scratch/online-poker/spec.md)
+and the selected ticket in [.scratch/online-poker/ticket-plan.md](.scratch/online-poker/ticket-plan.md).
+The current user decision is memory-only chips and reconnect reset to 100; its
+supersession details are in [.scratch/online-poker/memory-reset-decision.md](.scratch/online-poker/memory-reset-decision.md).
+Do not infer further variants or recovery guarantees.
 
 ## Workflow
 

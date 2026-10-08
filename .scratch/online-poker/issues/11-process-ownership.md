@@ -1,6 +1,8 @@
 # 11: 部署交叠时隔离旧进程
 
-Status: ready-for-agent
+> 已撤销：用户决定不使用数据库、不跨进程存档或重启恢复。以下保留旧票历史，不再实施。依据[当前决定](../memory-reset-decision.md)。
+
+Status: wontfix
 Type: implementation
 Spec: [在线德州扑克首版规格](../spec.md)
 Blocked by: [10](10-restart-recovery.md)
@@ -39,4 +41,3 @@ Implementation baseline: 待实施开始、任何代码编辑前记录 SHA。
 - 用户已确认12票拆分，本票据据此发布。后续讨论与证据追加到本票，保持规则与案例引用可追踪。
 - 10提供实际新进程读取存档及恢复期限路径，此依赖不是仅因编号顺序。
 - 本票是部署交叠写入正确性，不追加多实例高可用或零停机产品承诺。
-

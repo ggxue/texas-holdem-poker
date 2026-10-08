@@ -1,35 +1,31 @@
 package poker
 
 import (
-	"context"
+	"crypto/rand"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
 	"sync"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// App serves the single room. The caller owns the database pool.
+// App owns the single room and all its process-local state.
 type App struct {
-	mu      sync.Mutex
-	store   store
-	secret  []byte
-	clients map[*connection]struct{}
-	closed  bool
+	mu       sync.Mutex
+	state    room
+	requests map[string]receipt
+	secret   []byte
+	clients  map[*connection]struct{}
+	closed   bool
 }
 
-func New(ctx context.Context, db *pgxpool.Pool) (*App, error) {
-	s := store{db: db}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	secret, err := s.initialize(ctx)
-	if err != nil {
+func New() (*App, error) {
+	secret := make([]byte, 32)
+	if _, err := rand.Read(secret); err != nil {
 		return nil, err
 	}
-	return &App{store: s, secret: secret, clients: map[*connection]struct{}{}}, nil
+	return &App{state: room{Accounts: map[string]player{}, Bot: player{ID: "bot", Chips: 100}}, requests: map[string]receipt{}, secret: secret, clients: map[*connection]struct{}{}}, nil
 }
 
 func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -37,25 +33,28 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.serveSocket(w, r)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-	defer cancel()
-	r = r.WithContext(ctx)
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(5 * time.Second))
 	switch {
 	case r.URL.Path == "/api/state" && r.Method == http.MethodGet:
-		state, err := a.store.read(ctx)
-		if err != nil {
-			writeJSON(w, 503, view{Error: "restoring"})
-			return
-		}
 		id, credential, err := a.identify(r)
 		if err != nil {
-			writeJSON(w, 503, view{Error: "restoring"})
+			writeJSON(w, 503, view{Error: "unavailable"})
 			return
 		}
 		if credential != "" {
 			setIdentity(w, r, credential)
 		}
-		writeJSON(w, 200, state.visibleTo(id))
+		a.mu.Lock()
+		v := a.state.visibleTo(id)
+		if a.closed {
+			v.Error = "unavailable"
+		}
+		a.mu.Unlock()
+		if v.Error != "" {
+			writeJSON(w, 503, v)
+			return
+		}
+		writeJSON(w, 200, v)
 	case r.URL.Path == "/api/command" && r.Method == http.MethodPost:
 		if origin := r.Header.Get("Origin"); origin != "" {
 			u, err := url.Parse(origin)
@@ -81,20 +80,17 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		a.mu.Lock()
-		defer a.mu.Unlock()
 		if a.closed {
-			writeJSON(w, 503, view{Error: "restoring"})
+			a.mu.Unlock()
+			writeJSON(w, 503, view{Error: "unavailable"})
 			return
 		}
-		result, state, err := a.store.apply(ctx, id, cmd)
-		if err != nil {
-			writeJSON(w, 503, view{Error: "restoring"})
-			return
+		result, changed := a.apply(id, cmd)
+		if changed {
+			a.broadcast(a.state)
 		}
+		a.mu.Unlock()
 		writeJSON(w, result.Status, result.View)
-		if state != nil {
-			a.broadcast(*state)
-		}
 	default:
 		servePage(w, r)
 	}

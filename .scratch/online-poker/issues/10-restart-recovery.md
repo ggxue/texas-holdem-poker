@@ -1,6 +1,8 @@
 # 10: 重启恢复牌局与原期限
 
-Status: ready-for-agent
+> 已撤销：用户决定不使用数据库、不跨进程存档或重启恢复。以下保留旧票历史，不再实施。依据[当前决定](../memory-reset-decision.md)。
+
+Status: wontfix
 Type: implementation
 Spec: [在线德州扑克首版规格](../spec.md)
 Blocked by: [09](09-storage-failure-commit-resolution.md)
@@ -40,4 +42,3 @@ Implementation baseline: 待实施开始、任何代码编辑前记录 SHA。
 
 - 用户已确认12票拆分，本票据据此发布。后续讨论与证据追加到本票，保持规则与案例引用可追踪。
 - 09的待确认事务和存档重新读取是本票恢复前提；两进程交叠隔离由11完成，不在本票宣称无感切换。
-

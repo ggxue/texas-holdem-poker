@@ -26,15 +26,7 @@ func (a *App) serveSocket(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	if a.closed {
 		a.mu.Unlock()
-		writeJSON(w, 503, view{Error: "restoring"})
-		return
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-	state, err := a.store.read(ctx)
-	cancel()
-	if err != nil {
-		a.mu.Unlock()
-		writeJSON(w, 503, view{Error: "restoring"})
+		writeJSON(w, 503, view{Error: "unavailable"})
 		return
 	}
 	upgrader := websocket.Upgrader{HandshakeTimeout: 5 * time.Second}
@@ -43,10 +35,10 @@ func (a *App) serveSocket(w http.ResponseWriter, r *http.Request) {
 		a.mu.Unlock()
 		return
 	}
-	ctx, cancel = context.WithCancel(r.Context())
+	ctx, cancel := context.WithCancel(r.Context())
 	c := &connection{id: id, socket: socket, send: make(chan []byte, 16), ctx: ctx, cancel: cancel}
 	a.clients[c] = struct{}{}
-	a.queue(c, state.visibleTo(id))
+	a.queue(c, a.state.visibleTo(id))
 	a.mu.Unlock()
 	socket.SetReadLimit(4096)
 	writerDone := make(chan struct{})

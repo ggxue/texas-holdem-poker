@@ -9,7 +9,7 @@ let connecting = false;
 let retryDelay = 1000;
 const messages = {
   room_full: "房间已满，请稍后再试。",
-  restoring: "存档恢复中，请稍后重新连接。",
+  unavailable: "服务暂不可用，请稍后重新连接。",
   stale_state: "房间状态已更新，正在同步…",
   request_conflict: "请求标识冲突，请重新连接。",
   identity_required: "身份凭证已失效，请重新连接。",
@@ -43,7 +43,7 @@ function render(view) {
 async function state() {
   const response = await fetch("/api/state", { cache: "no-store" });
   const view = await response.json();
-  if (!response.ok) throw new Error(messages[view.error] || "存档恢复中。");
+  if (!response.ok) throw new Error(messages[view.error] || "服务暂不可用。");
   render(view);
   return view;
 }
@@ -70,7 +70,7 @@ async function connect() {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(command),
       });
       const result = await response.json();
-      if (response.status === 503) throw new Error("存档恢复中，入房结果待确认。请重新连接。");
+      if (response.status === 503) throw new Error("服务暂不可用，请重新连接。");
       sessionStorage.removeItem("poker.pendingJoin");
       if (result.error === "stale_state") continue;
       if (!response.ok) { render(result); return; }
@@ -86,7 +86,7 @@ async function connect() {
 function openSocket() {
   const connection = new WebSocket(`${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/api/ws`);
   socket = connection;
-  connection.onopen = () => { if (socket !== connection) return; retryDelay = 1000; statusLine.textContent = "已入房 · 筹码已保存"; };
+  connection.onopen = () => { if (socket !== connection) return; retryDelay = 1000; statusLine.textContent = "已入房 · 筹码仅保存在本次服务内存中"; };
   connection.onmessage = event => {
     if (socket !== connection) return;
     try { render(JSON.parse(event.data)); } catch { statusLine.textContent = "状态读取失败，请重新连接。"; }

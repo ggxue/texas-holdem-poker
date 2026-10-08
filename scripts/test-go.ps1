@@ -10,7 +10,6 @@ $ErrorActionPreference = 'Stop'
 $testRoot = Split-Path -Parent $PSScriptRoot
 Push-Location -LiteralPath $testRoot
 try {
-    if (-not $env:TEST_DATABASE_URL) { & (Join-Path $PSScriptRoot 'start-test-postgres.ps1') }
     $env:GOCACHE = Join-Path $testRoot '.tools/gocache'
     $env:GOPATH = Join-Path $testRoot '.tools/gopath'
     $env:GOTOOLCHAIN = 'local'

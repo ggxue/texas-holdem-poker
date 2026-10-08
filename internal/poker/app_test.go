@@ -1,21 +1,13 @@
-package poker_test
+package poker
 
 import (
-	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"texas-poker/internal/poker"
 )
 
 type playerView struct {
@@ -32,54 +24,9 @@ type roomView struct {
 	Error   string         `json:"error"`
 }
 
-func testDatabase(t *testing.T) *pgxpool.Pool {
+func testServer(t *testing.T) *httptest.Server {
 	t.Helper()
-	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Fatal("TEST_DATABASE_URL required: run scripts/start-test-postgres.ps1 first")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-	admin, err := pgx.Connect(ctx, dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = admin.Close(context.Background()) })
-	var suffix [8]byte
-	if _, err := rand.Read(suffix[:]); err != nil {
-		t.Fatal(err)
-	}
-	name := "poker_test_" + hex.EncodeToString(suffix[:])
-	quoted := pgx.Identifier{name}.Sanitize()
-	if _, err := admin.Exec(ctx, "CREATE DATABASE "+quoted); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
-		if _, err := admin.Exec(ctx, "DROP DATABASE "+quoted+" WITH (FORCE)"); err != nil {
-			t.Error(err)
-		}
-	})
-	config, err := pgxpool.ParseConfig(dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	config.ConnConfig.Database = name
-	db, err := pgxpool.NewWithConfig(ctx, config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(db.Close)
-	if err := db.Ping(ctx); err != nil {
-		t.Fatal(err)
-	}
-	return db
-}
-
-func testServer(t *testing.T, db *pgxpool.Pool) *httptest.Server {
-	t.Helper()
-	app, err := poker.New(context.Background(), db)
+	app, err := New()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +80,7 @@ func join(t *testing.T, client *http.Client, address, requestID string, version 
 }
 
 func TestAC07TwoHumansEnterAndThirdHumanIsRejected(t *testing.T) {
-	server := testServer(t, testDatabase(t))
+	server := testServer(t)
 	first, second, third := browser(t), browser(t), browser(t)
 	initial := getRoom(t, first, server.URL)
 	status, one := join(t, first, server.URL, "join-one", initial.Version)
@@ -158,43 +105,50 @@ func TestAC07TwoHumansEnterAndThirdHumanIsRejected(t *testing.T) {
 		t.Fatalf("third identity displaced occupants: %+v", unchanged)
 	}
 }
-
-func TestAC25CookiePreservesThirtySevenChipsAndMissingCookieCreatesNewIdentity(t *testing.T) {
-	for _, kind := range []string{"different-browser", "cleared-cookie"} {
+func TestAC25ReconnectResetsChipsAndMissingCookieCreatesNewIdentity(t *testing.T) {
+	for _, kind := range []string{"same-cookie", "different-browser", "cleared-cookie"} {
 		t.Run(kind, func(t *testing.T) {
-			db := testDatabase(t)
-			server := testServer(t, db)
+			app, err := New()
+			if err != nil {
+				t.Fatal(err)
+			}
+			server := httptest.NewServer(app)
+			t.Cleanup(func() { app.Close(); server.Close() })
 			client := browser(t)
 			initial := getRoom(t, client, server.URL)
 			status, joined := join(t, client, server.URL, "initial", initial.Version)
 			if status != http.StatusOK || joined.Seats[0] == nil || joined.Seats[0].Chips != 100 {
 				t.Fatalf("initial wallet: %d %+v", status, joined)
 			}
-			// Offline fixture permitted by AC25; observe the balance through HTTP.
-			if _, err := db.Exec(context.Background(), `UPDATE poker_room SET state = jsonb_set(state, ARRAY['accounts', $1, 'chips'], '37'::jsonb) WHERE id = 1`, initial.You); err != nil {
-				t.Fatal(err)
-			}
+			// Only fixture setup touches memory; all assertions use the public HTTP view.
+			app.mu.Lock()
+			p := app.state.Accounts[initial.You]
+			p.Chips = 37
+			app.state.Accounts[initial.You] = p
+			app.mu.Unlock()
 			client.CloseIdleConnections()
-			reopened := browser(t)
-			reopened.Jar = client.Jar // Closing the page preserves its browser Cookie.
-			returned := getRoom(t, reopened, server.URL)
-			status, returned = join(t, reopened, server.URL, "reopen", returned.Version)
-			if status != http.StatusOK || returned.You != initial.You || returned.Seats[0] == nil || returned.Seats[0].Chips != 37 {
-				t.Fatalf("same Cookie did not retain 37: %d %+v", status, returned)
+			returning := browser(t)
+			if kind == "same-cookie" {
+				returning.Jar = client.Jar
 			}
-			other := browser(t)
 			if kind == "cleared-cookie" {
-				other = reopened
-				jar, err := cookiejar.New(nil)
+				returning = client
+				returning.Jar, err = cookiejar.New(nil)
 				if err != nil {
 					t.Fatal(err)
 				}
-				other.Jar = jar
 			}
-			newIdentity := getRoom(t, other, server.URL)
-			status, both := join(t, other, server.URL, "new-identity", newIdentity.Version)
-			if status != http.StatusOK || both.Seats[0] == nil || both.Seats[1] == nil || both.Seats[0].Chips != 37 || both.Seats[1].Chips != 100 || both.Seats[1].ID == initial.You {
-				t.Fatalf("new identity changed old funds: %d %+v", status, both)
+			current := getRoom(t, returning, server.URL)
+			status, result := join(t, returning, server.URL, "return", current.Version)
+			if status != http.StatusOK {
+				t.Fatalf("return: %d %+v", status, result)
+			}
+			if kind == "same-cookie" {
+				if result.You != initial.You || result.Seats[0] == nil || result.Seats[0].Chips != 100 || result.Seats[1] != nil || result.Host != initial.You {
+					t.Fatalf("reconnect did not reset to 100 in same seat: %+v", result)
+				}
+			} else if result.You == initial.You || result.Seats[1] == nil || result.Seats[1].Chips != 100 || result.Seats[0] == nil || result.Seats[0].Chips != 37 {
+				t.Fatalf("new identity transferred or reset another wallet: %+v", result)
 			}
 		})
 	}
