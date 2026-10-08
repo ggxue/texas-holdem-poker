@@ -19,7 +19,7 @@ func TestAC10MidHandJoinWaitsAndGetsNoPrivateCards(t *testing.T) {
 			t.Fatal("waiting player obtained private cards or qualification")
 		}
 	}
-	status, rejected := gameCommand(t, second, server.URL, "attempt", "check", v)
+	status, rejected := settledCommand(t, second, server.URL, "attempt", "check", v)
 	if status != 409 || rejected.Error != "not_your_turn" || rejected.Version != v.Version {
 		t.Fatal("waiting player acted")
 	}

@@ -12,26 +12,28 @@ import (
 
 // App owns the single room and all its process-local state.
 type App struct {
-	mu          sync.Mutex
-	state       room
-	requests    map[string]receipt
-	secret      []byte
-	clients     map[*connection]struct{}
-	closed      bool
-	deck        func() ([]Card, error)
-	actionStart func([]int) (int, error)
-	active      map[string]*connection
-	clock       Clock
-	timer       Timer
-	wake        *int
-	fault       string
+	mu              sync.Mutex
+	state           room
+	requests        map[string]receipt
+	secret          []byte
+	clients         map[*connection]struct{}
+	closed          bool
+	deck            func() ([]Card, error)
+	actionStart     func([]int) (int, error)
+	botThinkSeconds func() (int, error)
+	active          map[string]*connection
+	clock           Clock
+	timer           Timer
+	wake            *int
+	fault           string
 }
 
 // Options controls cards, time and action-start randomness offline, never via HTTP.
 type Options struct {
-	Deck        func() ([]Card, error)
-	Clock       Clock
-	ActionStart func([]int) (int, error)
+	Deck            func() ([]Card, error)
+	Clock           Clock
+	ActionStart     func([]int) (int, error)
+	BotThinkSeconds func() (int, error)
 }
 
 func New() (*App, error) { return NewWithOptions(Options{}) }
@@ -53,7 +55,11 @@ func NewWithOptions(options Options) (*App, error) {
 	if actionStart == nil {
 		actionStart = randomActionStart
 	}
-	return &App{state: room{Accounts: map[string]player{}, Bot: player{ID: "bot", Chips: 100}, Controls: map[string]controller{}, Disconnected: map[string]time.Time{}, Connecting: map[string]time.Time{}}, requests: map[string]receipt{}, secret: secret, clients: map[*connection]struct{}{}, active: map[string]*connection{}, deck: deck, clock: clock, actionStart: actionStart}, nil
+	botThinkSeconds := options.BotThinkSeconds // 离线配置只替换思考时间抽样，不增加在线入口。
+	if botThinkSeconds == nil {                // 正常运行使用一到八秒的无偏抽样。
+		botThinkSeconds = randomBotThinkSeconds // 每个新机器人行动机会独立抽样。
+	}
+	return &App{state: room{Accounts: map[string]player{}, Bot: player{ID: "bot", Chips: 100}, Controls: map[string]controller{}, Disconnected: map[string]time.Time{}, Connecting: map[string]time.Time{}}, requests: map[string]receipt{}, secret: secret, clients: map[*connection]struct{}{}, active: map[string]*connection{}, deck: deck, clock: clock, actionStart: actionStart, botThinkSeconds: botThinkSeconds}, nil // 保存本进程的思考时间来源。
 }
 
 func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {

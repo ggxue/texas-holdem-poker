@@ -29,7 +29,7 @@ func bettingRoom(t *testing.T, balances [3]int64) (*App, *httptest.Server, [2]*h
 	}
 	app.state.Bot.Chips = balances[2]
 	app.mu.Unlock()
-	status, v := gameCommand(t, clients[0], server.URL, "start", "start", gameState(t, clients[0], server.URL))
+	status, v := settledCommand(t, clients[0], server.URL, "start", "start", gameState(t, clients[0], server.URL))
 	if status != 200 {
 		t.Fatalf("start %d %+v", status, v)
 	}
@@ -37,7 +37,7 @@ func bettingRoom(t *testing.T, balances [3]int64) (*App, *httptest.Server, [2]*h
 }
 func do(t *testing.T, c *http.Client, url, id, action string) gameView {
 	t.Helper()
-	status, v := gameCommand(t, c, url, id, action, gameState(t, c, url))
+	status, v := settledCommand(t, c, url, id, action, gameState(t, c, url))
 	if status != 200 {
 		t.Fatalf("%s: %d %+v", action, status, v)
 	}
@@ -50,7 +50,7 @@ func do(t *testing.T, c *http.Client, url, id, action string) gameView {
 func finishChecks(t *testing.T, clients [2]*http.Client, url string) gameView {
 	t.Helper()
 	for i := 0; i < 12; i++ {
-		v := gameState(t, clients[0], url)
+		v := finishBot(t, clients[0], url, gameState(t, clients[0], url))
 		if v.Hand.Stage == "finished" {
 			return v
 		}
@@ -67,15 +67,15 @@ func TestAC14And15OneBetAndEarlierCheckerResponds(t *testing.T) {
 	_, s, c, _ := bettingRoom(t, [3]int64{100, 100, 100})
 	do(t, c[0], s.URL, "check-first", "check")
 	beforeBet := gameState(t, c[1], s.URL)
-	status, v := gameCommand(t, c[1], s.URL, "bet", "bet", beforeBet)
+	status, v := settledCommand(t, c[1], s.URL, "bet", "bet", beforeBet)
 	if status != 200 {
 		t.Fatalf("bet: %d %+v", status, v)
 	}
-	status, retry := gameCommand(t, c[1], s.URL, "bet", "bet", beforeBet)
+	status, retry := settledCommand(t, c[1], s.URL, "bet", "bet", beforeBet)
 	if status != 200 || retry.Version != v.Version || retry.Hand.Pot != v.Hand.Pot {
 		t.Fatal("AC34 lost-response retry repeated bet")
 	}
-	status, conflict := gameCommand(t, c[1], s.URL, "bet", "call", beforeBet)
+	status, conflict := settledCommand(t, c[1], s.URL, "bet", "call", beforeBet)
 	if status != 409 || conflict.Error != "request_conflict" || conflict.Version != v.Version {
 		t.Fatal("AC34 same request ID changed contents")
 	}
@@ -84,7 +84,7 @@ func TestAC14And15OneBetAndEarlierCheckerResponds(t *testing.T) {
 	}
 	current := gameState(t, c[0], s.URL)
 	for i, action := range []string{"bet", "check"} {
-		status, rejected := gameCommand(t, c[0], s.URL, string(rune('a'+i)), action, current)
+		status, rejected := settledCommand(t, c[0], s.URL, string(rune('a'+i)), action, current)
 		if status != 409 || rejected.Version != current.Version || rejected.Hand.Pot != 23 {
 			t.Fatalf("illegal %s: %d %+v", action, status, rejected)
 		}
@@ -94,7 +94,7 @@ func TestAC14And15OneBetAndEarlierCheckerResponds(t *testing.T) {
 		t.Fatalf("call: %+v", v)
 	}
 	before := gameState(t, c[0], s.URL)
-	status, old := gameCommand(t, c[0], s.URL, "old", "check", current)
+	status, old := settledCommand(t, c[0], s.URL, "old", "check", current)
 	if status != 409 || old.Version != before.Version {
 		t.Fatal("stale action changed state")
 	}

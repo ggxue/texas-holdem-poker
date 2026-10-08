@@ -18,7 +18,7 @@ func TestAC24OnlyZeroBalanceRefillsBeforeNextHand(t *testing.T) {
 			app.state.Bot.Chips = balances[2]
 			app.mu.Unlock()
 			before := gameState(t, c[0], s.URL)
-			status, v := gameCommand(t, c[0], s.URL, "next", "start", before)
+			status, v := settledCommand(t, c[0], s.URL, "next", "start", before)
 			if status != 200 || v.Hand.ID == oldID {
 				t.Fatalf("next start: %d %+v", status, v)
 			}
@@ -35,7 +35,7 @@ func TestAC24OnlyZeroBalanceRefillsBeforeNextHand(t *testing.T) {
 			if balances[0] == 1 && (!v.Hand.Players[0].AllIn || v.Hand.Actor == v.Seats[0].ID) {
 				t.Fatal("positive one must ante allin without refill")
 			}
-			status, retry := gameCommand(t, c[0], s.URL, "next", "start", before)
+			status, retry := settledCommand(t, c[0], s.URL, "next", "start", before)
 			if status != 200 || retry.Version != v.Version || retry.Seats[0].Chips != v.Seats[0].Chips || retry.Bot.Chips != v.Bot.Chips {
 				t.Fatal("retry refilled or charged twice")
 			}

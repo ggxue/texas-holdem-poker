@@ -69,12 +69,15 @@ func (a *App) apply(id string, cmd command) (outcome, bool) {
 	} else if a.state.Version == math.MaxInt64 {
 		rejection = "version_exhausted"
 	} else if cmd.Action != "join" {
-		original := a.state.clone()
-		rejection = a.gameCommand(id, cmd)
-		if rejection == "" {
-			a.state.Version++
-		} else {
-			a.state = original
+		original := a.state.clone()        // 动作、扣款和期限共用回滚边界。
+		rejection = a.gameCommand(id, cmd) // 执行公开游戏命令。
+		if rejection == "" {               // 推进成功后才能抽样新机会期限。
+			rejection = a.ensureDeadline() // 无效随机源不能留下半完成的动作。
+		}
+		if rejection == "" { // 状态和期限共同成功才确认版本。
+			a.state.Version++ // 确认本次原子命令。
+		} else { // 失败时恢复所有扣款和牌局。
+			a.state = original // 原机会期限同时保留。
 		}
 	} else if seat < 0 {
 		rejection = "room_full"
@@ -118,7 +121,6 @@ func (a *App) apply(id string, cmd command) (outcome, bool) {
 		delete(a.active, id)
 	}
 	if rejection == "" {
-		a.ensureDeadline()
 		a.scheduleLocked()
 	}
 	result.View = a.visibleTo(id)

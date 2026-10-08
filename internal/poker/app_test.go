@@ -30,11 +30,13 @@ type roomView struct {
 
 func testServer(t *testing.T) *httptest.Server {
 	t.Helper()
-	app, err := NewWithOptions(Options{ActionStart: firstActionStart})
+	clock := newClock()
+	app, err := NewWithOptions(Options{ActionStart: firstActionStart, Clock: clock, BotThinkSeconds: thinkSeconds(1)})
 	if err != nil {
 		t.Fatal(err)
 	}
 	server := httptest.NewServer(app)
+	registerClock(t, server.URL, clock)
 	t.Cleanup(func() { app.Close(); server.Close() })
 	return server
 }

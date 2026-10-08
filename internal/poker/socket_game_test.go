@@ -68,7 +68,7 @@ func TestAC31SocketViewsHideOpponentsAndDeck(t *testing.T) {
 	v = getRoom(t, two, server.URL)
 	join(t, two, server.URL, "two", v.Version)
 	first, second := gameSocket(t, one, server.URL), gameSocket(t, two, server.URL)
-	status, started := gameCommand(t, one, server.URL, "start", "start", gameState(t, one, server.URL))
+	status, started := settledCommand(t, one, server.URL, "start", "start", gameState(t, one, server.URL))
 	if status != 200 {
 		t.Fatal(status)
 	}

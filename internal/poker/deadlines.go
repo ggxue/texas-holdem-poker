@@ -15,19 +15,30 @@ func (a *App) visibleTo(id string) view {
 	return v // 快照不会携带私有牌序。
 }
 
-func (a *App) ensureDeadline() {
+func (a *App) ensureDeadline() string {
 	h := a.state.Hand // 行动期限属于本局的具体机会。
 	if h == nil {     // 未开局没有行动计时。
-		return // 不创建额外期限。
+		return "" // 不创建额外期限。
 	}
 	if h.Stage == "finished" || h.Actor < 0 { // 已结束没有合法行动机会。
-		h.Deadline = time.Time{} // 清空行动倒计时。
-		return                   // 断线宽限由独立期限管理。
+		h.Deadline = time.Time{}        // 清空行动倒计时。
+		h.ThinkingStarted = time.Time{} // 已结算不继续显示思考。
+		return ""                       // 断线宽限由独立期限管理。
 	}
 	if h.deadlineTurn != h.Turn || h.Deadline.IsZero() { // 只有新的行动机会才给30秒。
 		h.Deadline = a.clock.Now().Add(30 * time.Second) // 新期限从实际推进时起算。
-		h.deadlineTurn = h.Turn                          // 将期限绑定当前行动标识。
+		h.ThinkingStarted = time.Time{}                  // 真人机会没有机器人显示依据。
+		if h.Players[h.Actor].ID == "bot" {              // 仅新机器人机会抽样一次。
+			seconds, err := a.botThinkSeconds()           // 不在等待期间持锁休眠。
+			if err != nil || seconds < 1 || seconds > 8 { // 无效离线配置与随机源错误都必须显式失败。
+				return "unavailable" // 由外层回滚本次事务。
+			}
+			h.ThinkingStarted = a.clock.Now()                                        // 保存刷新和重连共用的三十秒起算点。
+			h.Deadline = h.ThinkingStarted.Add(time.Duration(seconds) * time.Second) // 实际动作只等抽中的整数秒。
+		}
+		h.deadlineTurn = h.Turn // 将期限绑定当前行动标识。
 	}
+	return "" // 已有机会保持原期限和抽样结果。
 }
 
 func (a *App) nextDeadline() time.Time {
@@ -110,22 +121,27 @@ func (a *App) tickLocked() {
 		} else if rejection == "" { // 没有同刻离房则处理行动超时。
 			h := a.state.Hand                         // 最早期限属于当前行动机会。
 			action := "check"                         // 不欠注时自动过牌。
-			if h.Players[h.Actor].Street < h.Target { // 欠注时不能自动跟注。
-				action = "fold" // 自动弃牌而不是替玩家付钱。
+			if h.Players[h.Actor].Street < h.Target { // 欠注时区分机器人规则与真人超时。
+				action = "fold"                     // 真人超时不能自动付钱。
+				if h.Players[h.Actor].ID == "bot" { // 机器人固定跟注，不分析牌力。
+					action = "call" // 金额由统一规则按实际余额限制。
+				}
 			}
 			rejection = a.state.act(action) // 用同一合法动作规则处理超时。
 			if rejection == "" {            // 动作成功后才推进。
 				rejection = a.state.advance() // 机器人和下一阶段立即执行。
 			}
 		}
+		if rejection == "" { // 动作及离房成功后才为新机会建立期限。
+			rejection = a.ensureDeadline() // 期限抽样失败也属于同一原子事件。
+		}
 		if rejection != "" { // 出错时不保留部分扣款或资格变更。
 			a.state = original  // 回滚整个自动事件。
 			a.fault = rejection // 明确报告故障并停止继续自动调度。
 			break               // 避免对已过期失败事件不断重试。
 		}
-		a.ensureDeadline() // 新机会从本次真实处理时间开始30秒。
-		a.state.Version++  // 自动状态变更也有权威版本。
-		changed = true     // 本批需要通知客户端。
+		a.state.Version++ // 自动状态变更也有权威版本。
+		changed = true    // 本批需要通知客户端。
 	}
 	if changed || a.fault != "" { // 只发送已共同更新的状态或明确故障。
 		a.broadcast(a.state) // 每名收件人仍按身份裁剪。

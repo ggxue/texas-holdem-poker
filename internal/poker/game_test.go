@@ -17,17 +17,18 @@ type gameView struct {
 	Seats   []*playerView `json:"seats"`
 	Bot     playerView    `json:"bot"`
 	Hand    *struct {
-		ID        int64    `json:"id"`
-		Turn      int64    `json:"turn"`
-		Actor     string   `json:"actor"`
-		Stage     string   `json:"stage"`
-		Pot       int64    `json:"pot"`
-		Target    int64    `json:"target"`
-		Legal     []string `json:"legal"`
-		Deadline  int64    `json:"deadline"`
-		StartSeat int      `json:"actionStartSeat"`
-		Board     []Card   `json:"board"`
-		Players   []struct {
+		ID          int64    `json:"id"`
+		Turn        int64    `json:"turn"`
+		Actor       string   `json:"actor"`
+		Stage       string   `json:"stage"`
+		Pot         int64    `json:"pot"`
+		Target      int64    `json:"target"`
+		Legal       []string `json:"legal"`
+		Deadline    int64    `json:"deadline"`
+		BotThinking bool     `json:"botThinking"`
+		StartSeat   int      `json:"actionStartSeat"`
+		Board       []Card   `json:"board"`
+		Players     []struct {
 			ID       string    `json:"id"`
 			Seat     int       `json:"seat"`
 			Hole     []Card    `json:"hole"`
@@ -70,11 +71,18 @@ func fixtureServer(t *testing.T, prefix []Card, options ...Options) (*App, *http
 			config.ActionStart = firstActionStart
 		}
 	}
+	if config.Clock == nil {
+		config.Clock = newClock()
+	}
+	if config.BotThinkSeconds == nil {
+		config.BotThinkSeconds = thinkSeconds(1)
+	}
 	app, e := NewWithOptions(config)
 	if e != nil {
 		t.Fatal(e)
 	}
 	server := httptest.NewServer(app)
+	registerClock(t, server.URL, config.Clock.(*manualClock))
 	t.Cleanup(func() { app.Close(); server.Close() })
 	return app, server
 }
@@ -86,15 +94,15 @@ func TestAC09InvalidStartsPreserveState(t *testing.T) {
 	v = getRoom(t, two, server.URL)
 	join(t, two, server.URL, "two", v.Version)
 	before := gameState(t, two, server.URL)
-	status, rejected := gameCommand(t, two, server.URL, "not-host", "start", before)
+	status, rejected := settledCommand(t, two, server.URL, "not-host", "start", before)
 	if status != 409 || rejected.Error != "host_only" || rejected.Version != before.Version {
 		t.Fatalf("non-host: %d %+v", status, rejected)
 	}
-	status, started := gameCommand(t, one, server.URL, "host", "start", gameState(t, one, server.URL))
+	status, started := settledCommand(t, one, server.URL, "host", "start", gameState(t, one, server.URL))
 	if status != 200 {
 		t.Fatal(status)
 	}
-	status, rejected = gameCommand(t, one, server.URL, "again", "start", started)
+	status, rejected = settledCommand(t, one, server.URL, "again", "start", started)
 	if status != 409 || rejected.Error != "hand_active" || rejected.Version != started.Version || rejected.Hand.Pot != started.Hand.Pot || rejected.Hand.ID != started.Hand.ID {
 		t.Fatalf("active restart: %+v", rejected)
 	}
@@ -108,7 +116,7 @@ func TestAC22OnlyTiedWinnersShareOddPot(t *testing.T) {
 	join(t, one, server.URL, "one", v.Version)
 	v = getRoom(t, two, server.URL)
 	join(t, two, server.URL, "two", v.Version)
-	_, started := gameCommand(t, one, server.URL, "start", "start", gameState(t, one, server.URL))
+	_, started := settledCommand(t, one, server.URL, "start", "start", gameState(t, one, server.URL))
 	// 非公开fixture只预置已确认的结算输入，所有断言使用HTTP视图。
 	app.mu.Lock()
 	app.state.Hand.Pot = 21
@@ -118,7 +126,7 @@ func TestAC22OnlyTiedWinnersShareOddPot(t *testing.T) {
 	app.mu.Unlock()
 	current := gameState(t, two, server.URL)
 	for i := 0; i < 4; i++ {
-		status, next := gameCommand(t, two, server.URL, string(rune('a'+i)), "check", current)
+		status, next := settledCommand(t, two, server.URL, string(rune('a'+i)), "check", current)
 		if status != 200 {
 			t.Fatalf("check %d %+v", status, next)
 		}
@@ -130,7 +138,7 @@ func TestAC22OnlyTiedWinnersShareOddPot(t *testing.T) {
 	if current.Hand.Players[0].Strength != nil || len(current.Hand.Players[0].Hole) != 0 {
 		t.Fatal("folded hole cards leaked")
 	}
-	status, retry := gameCommand(t, one, server.URL, "start", "start", gameView{Version: started.Version - 1, Control: started.Control})
+	status, retry := settledCommand(t, one, server.URL, "start", "start", gameView{Version: started.Version - 1, Control: started.Control})
 	if status != 200 || retry.Hand.ID != started.Hand.ID {
 		t.Fatalf("cached start: %d %+v", status, retry)
 	}
@@ -190,7 +198,7 @@ func TestAC08And13HostStartsAndChecksToShowdown(t *testing.T) {
 				}
 			}
 			before := gameState(t, first, server.URL)
-			status, v := gameCommand(t, first, server.URL, "start", "start", before)
+			status, v := settledCommand(t, first, server.URL, "start", "start", before)
 			if status != 200 || v.Hand == nil {
 				t.Fatalf("start: %d %+v", status, v)
 			}
@@ -200,18 +208,18 @@ func TestAC08And13HostStartsAndChecksToShowdown(t *testing.T) {
 			if len(v.Hand.Players) != humans+1 || len(v.Hand.Players[0].Hole) != 2 || len(v.Hand.Players[len(v.Hand.Players)-1].Hole) != 0 {
 				t.Fatalf("private cards: %+v", v.Hand)
 			}
-			status, retry := gameCommand(t, first, server.URL, "start", "start", before)
+			status, retry := settledCommand(t, first, server.URL, "start", "start", before)
 			if status != 200 || retry.Version != v.Version {
 				t.Fatalf("start retry: %d %+v", status, retry)
 			}
 			for street, want := range []int{3, 4, 5, 5} {
-				status, v = gameCommand(t, first, server.URL, string(rune('a'+street)), "check", v)
+				status, v = settledCommand(t, first, server.URL, string(rune('a'+street)), "check", v)
 				if status != 200 {
 					t.Fatalf("check: %d %+v", status, v)
 				}
 				if humans == 2 {
 					other := gameState(t, second, server.URL)
-					status, _ = gameCommand(t, second, server.URL, string(rune('a'+street)), "check", other)
+					status, _ = settledCommand(t, second, server.URL, string(rune('a'+street)), "check", other)
 					v = gameState(t, first, server.URL)
 					if status != 200 {
 						t.Fatal(status)

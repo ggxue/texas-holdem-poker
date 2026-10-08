@@ -20,7 +20,7 @@ func TestAC26NewPageTakesControlAndOldEventsAreRejected(t *testing.T) {
 	newPage := browser(t)
 	newPage.Jar = oldPage.Jar
 	current := gameState(t, newPage, s.URL)
-	status, after := gameCommand(t, newPage, s.URL, "new-page", "join", current)
+	status, after := settledCommand(t, newPage, s.URL, "new-page", "join", current)
 	if status != 200 || after.You != before.You || after.Hand.ID != before.Hand.ID || after.Hand.Turn != before.Hand.Turn || after.Seats[0].Chips != 100 || after.Hand.Pot != 2 || after.Host != before.Host {
 		t.Fatalf("takeover: %d %+v", status, after)
 	}
@@ -43,12 +43,12 @@ func TestAC26NewPageTakesControlAndOldEventsAreRejected(t *testing.T) {
 	if !found {
 		t.Fatal("old socket did not receive takeover message")
 	}
-	status, rejected := gameCommand(t, oldPage, s.URL, "late", "check", before)
+	status, rejected := settledCommand(t, oldPage, s.URL, "late", "check", before)
 	if status != 409 || rejected.Error != "taken_over" || rejected.Version != after.Version {
 		t.Fatalf("old action: %d %+v", status, rejected)
 	}
 	oldCurrent := gameState(t, oldPage, s.URL)
-	status, rejected = gameCommand(t, oldPage, s.URL, "old-reconnect", "join", oldCurrent)
+	status, rejected = settledCommand(t, oldPage, s.URL, "old-reconnect", "join", oldCurrent)
 	if status != 409 || rejected.Error != "taken_over" {
 		t.Fatalf("old reconnect: %d %+v", status, rejected)
 	}
@@ -67,7 +67,7 @@ func TestAC32OldHandTurnAndForgedWalletAreRejected(t *testing.T) {
 	handCopy := *current.Hand
 	oldHand.Hand = &handCopy
 	oldHand.Hand.ID--
-	status, v := gameCommand(t, c[0], s.URL, "old-hand", "check", oldHand)
+	status, v := settledCommand(t, c[0], s.URL, "old-hand", "check", oldHand)
 	if status != 409 || v.Error != "stale_turn" || v.Version != current.Version {
 		t.Fatal("old hand accepted")
 	}
@@ -75,7 +75,7 @@ func TestAC32OldHandTurnAndForgedWalletAreRejected(t *testing.T) {
 	turnCopy := *current.Hand
 	oldTurn.Hand = &turnCopy
 	oldTurn.Hand.Turn--
-	status, v = gameCommand(t, c[0], s.URL, "old-turn", "check", oldTurn)
+	status, v = settledCommand(t, c[0], s.URL, "old-turn", "check", oldTurn)
 	if status != 409 || v.Error != "stale_turn" || v.Version != current.Version {
 		t.Fatal("old turn accepted")
 	}

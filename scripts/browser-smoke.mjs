@@ -72,6 +72,20 @@ async function screenshot(page, name) {
   await fs.writeFile(`artifacts/${name}.png`, Buffer.from(picture.data, 'base64'));
 }
 const report = {browser:info.Browser, origin:base, cases:[], errors};
+async function observeThinking(page) {
+  await wait(page, 'confirmed?.hand?.botThinking', 'robot thinking');
+  const start = await state(page);
+  assert(start.hand.actor === 'bot' && start.hand.deadline - start.serverTime <= 30000 && start.hand.deadline - start.serverTime > 21000, 'robot display must use thirty real seconds');
+  assert(await evaluate(page, "document.body.innerText.includes('思考中') && !document.querySelector('#actions button:not(:disabled)')?.textContent.match(/过牌|下注|跟注|弃牌/)"), 'thinking label or human controls');
+  await evaluate(page, 'state()');
+  const refreshed = await state(page);
+  assert(refreshed.hand.turn === start.hand.turn && refreshed.hand.deadline === start.hand.deadline, 'query reset thinking display');
+  await screenshot(page, 'poker-thinking');
+  await wait(page, `confirmed.hand.turn !== ${start.hand.turn}`, 'actual robot action');
+  const next = await state(page);
+  assert(next.hand.actor !== 'bot' && next.hand.deadline - next.serverTime === 30000, 'next human did not get fresh thirty seconds');
+  report.cases.push('robot thinking label, thirty-second display basis retained across query, action before display expires, next human fresh thirty seconds');
+}
 try {
   const health = await fetch(base + '/healthz');
   assert(health.ok && (await health.text()).trim() === 'ok', 'health probe failed');
@@ -85,7 +99,11 @@ try {
   await wait(second, "confirmed?.seats[1]?.id === confirmed?.you && socket?.readyState === WebSocket.OPEN", 'second entry');
   const waiting = await state(second);
   assert(!waiting.hand.players.some(player => player.id === waiting.you), 'mid-hand entrant was dealt');
-  for (let i = 0; i < 4; i++) await action(first, '过牌');
+  for (let i = 0; i < 4; i++) {
+    await action(first, '过牌');
+    if (i === 0) await observeThinking(first);
+  }
+  await wait(first, "confirmed?.hand?.stage === 'finished'", 'solo settlement after bot');
   assert((await state(first)).hand.stage === 'finished', 'solo did not settle');
   report.cases.push('one human + bot, mid-hand waiting entrant, four check streets and result');
   await action(first, '开始');
@@ -113,6 +131,7 @@ try {
   await wait(caller, "document.getElementById('actions').textContent.includes('跟注 10')", 'call amount');
   await action(caller, '跟注');
   for (let i = 0; i < 6; i++) await action(await currentHuman([first, second]), '过牌');
+  await wait(first, "confirmed?.hand?.stage === 'finished'", 'two human settlement after bot');
   assert((await state(first)).hand.stage === 'finished', 'three player game did not settle');
   await screenshot(first, 'poker-desktop');
   await screenshot(second, 'poker-mobile');

@@ -57,11 +57,12 @@ func (c *manualClock) advance(d time.Duration) {
 func clockRoom(t *testing.T, humans int, balances ...[3]int64) (*httptest.Server, [2]*http.Client, *manualClock, [2]*websocket.Conn, gameView) {
 	t.Helper()
 	clock := newClock()
-	app, e := NewWithOptions(Options{Deck: fixedDeck(nil), Clock: clock, ActionStart: firstActionStart})
+	app, e := NewWithOptions(Options{Deck: fixedDeck(nil), Clock: clock, ActionStart: firstActionStart, BotThinkSeconds: thinkSeconds(1)})
 	if e != nil {
 		t.Fatal(e)
 	}
 	server := httptest.NewServer(app)
+	registerClock(t, server.URL, clock)
 	t.Cleanup(func() { app.Close(); server.Close() })
 	clients := [2]*http.Client{browser(t), browser(t)}
 	sockets := [2]*websocket.Conn{}
@@ -160,7 +161,7 @@ func TestAC30GraceBlocksNewHandUntilDeparture(t *testing.T) {
 	finishChecks(t, c, s.URL)
 	ws[1].Close()
 	lost := observedDisconnect(t, c[0], s.URL, 1)
-	status, rejected := gameCommand(t, c[0], s.URL, "blocked", "start", lost)
+	status, rejected := settledCommand(t, c[0], s.URL, "blocked", "start", lost)
 	if status != 409 || rejected.Error != "connection_grace" || rejected.Version != lost.Version {
 		t.Fatalf("grace start %d %+v", status, rejected)
 	}
@@ -195,6 +196,7 @@ func TestAC26TakeoverKeepsDeadlineAndOldCloseStartsNoGrace(t *testing.T) {
 	ws[0].Close()
 	clock.advance(20 * time.Second)
 	current := gameState(t, newPage, s.URL)
+	current = finishBot(t, newPage, s.URL, current)
 	if after.Hand.Deadline != original || current.Seats[0] == nil || current.Seats[0].DisconnectedUntil != 0 || current.Hand.Stage != "flop" {
 		t.Fatalf("takeover deadline or old close: %+v", current)
 	}
@@ -234,7 +236,7 @@ func TestAC38ConcurrentLateRequestsCannotBeatExpiredDeparture(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			status, _ := gameCommand(t, c[0], s.URL, fmt.Sprintf("late-%d", i), "check", before)
+			status, _ := settledCommand(t, c[0], s.URL, fmt.Sprintf("late-%d", i), "check", before)
 			statuses <- status
 		}(i)
 	}
@@ -261,16 +263,16 @@ func TestAC30EntryWithoutControlHandshakeExpires(t *testing.T) {
 	t.Cleanup(func() { app.Close(); s.Close() })
 	c := browser(t)
 	initial := gameState(t, c, s.URL)
-	status, joined := gameCommand(t, c, s.URL, "join", "join", initial)
+	status, joined := settledCommand(t, c, s.URL, "join", "join", initial)
 	if status != 200 || joined.Seats[0] == nil {
 		t.Fatalf("join: %d %+v", status, joined)
 	}
-	status, rejected := gameCommand(t, c, s.URL, "start", "start", joined)
+	status, rejected := settledCommand(t, c, s.URL, "start", "start", joined)
 	if status != 409 || rejected.Error != "connection_grace" {
 		t.Fatal("page with no control socket could start")
 	}
 	clock.advance(10 * time.Second)
-	status, retry := gameCommand(t, c, s.URL, "retry-join", "join", gameState(t, c, s.URL))
+	status, retry := settledCommand(t, c, s.URL, "retry-join", "join", gameState(t, c, s.URL))
 	if status != 200 || retry.Seats[0].ConnectingUntil != joined.Seats[0].ConnectingUntil {
 		t.Fatal("failed handshake retry extended original connection deadline")
 	}

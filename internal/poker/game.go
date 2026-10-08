@@ -21,35 +21,45 @@ type participant struct {
 	acted    bool
 }
 type hand struct {
-	ID           int64
-	Turn         int64
-	Stage        string
-	Pot          int64
-	Board        []Card
-	Players      []participant
-	Actor        int
-	Start        int
-	Target       int64
-	deck         []Card
-	cursor       int
-	showdown     bool
-	Deadline     time.Time
-	deadlineTurn int64
+	ID              int64
+	Turn            int64
+	Stage           string
+	Pot             int64
+	Board           []Card
+	Players         []participant
+	Actor           int
+	Start           int
+	Target          int64
+	deck            []Card
+	cursor          int
+	showdown        bool
+	Deadline        time.Time
+	ThinkingStarted time.Time
+	deadlineTurn    int64
 }
 type handView struct {
-	ID         int64         `json:"id"`
-	Turn       int64         `json:"turn"`
-	Stage      string        `json:"stage"`
-	Pot        int64         `json:"pot"`
-	Board      []Card        `json:"board"`
-	Players    []participant `json:"players"`
-	Actor      string        `json:"actor"`
-	Target     int64         `json:"target"`
-	Legal      []string      `json:"legal"`
-	CallAmount int64         `json:"callAmount"`
-	BetAmount  int64         `json:"betAmount"`
-	Deadline   int64         `json:"deadline"`
-	StartSeat  int           `json:"actionStartSeat"`
+	ID          int64         `json:"id"`
+	Turn        int64         `json:"turn"`
+	Stage       string        `json:"stage"`
+	Pot         int64         `json:"pot"`
+	Board       []Card        `json:"board"`
+	Players     []participant `json:"players"`
+	Actor       string        `json:"actor"`
+	Target      int64         `json:"target"`
+	Legal       []string      `json:"legal"`
+	CallAmount  int64         `json:"callAmount"`
+	BetAmount   int64         `json:"betAmount"`
+	Deadline    int64         `json:"deadline"`
+	StartSeat   int           `json:"actionStartSeat"`
+	BotThinking bool          `json:"botThinking"`
+}
+
+func randomBotThinkSeconds() (int, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(8)) // 八个整数秒各有相同概率。
+	if err != nil {                                // 随机源故障不能冒充有效机会。
+		return 0, err // 由调用方原子拒绝或报告自动事件故障。
+	}
+	return int(n.Int64()) + 1, nil // 返回一到八秒，不包含零秒。
 }
 
 func randomActionStart(seats []int) (int, error) {
@@ -87,6 +97,10 @@ func (h *hand) visibleTo(id string) *handView {
 	v.StartSeat = h.Players[h.Start].Seat                                                                                                                                   // 全局保留同一公开行动起点，包含已全押或离房者。
 	if !h.Deadline.IsZero() {                                                                                                                                               // 有有效行动机会时才公开期限。
 		v.Deadline = h.Deadline.UnixMilli() // 使用绝对毫秒时间，重连不会重新计时。
+		if !h.ThinkingStarted.IsZero() {    // 机器人实际期限与页面三十秒显示分别保存。
+			v.BotThinking = true                                             // 显示思考状态，不暴露未来实际动作时刻。
+			v.Deadline = h.ThinkingStarted.Add(30 * time.Second).UnixMilli() // 刷新沿用原始显示依据。
+		}
 	}
 	for i, p := range h.Players { // 按参赛身份裁剪暗牌，座位重用不会转移手牌。
 		v.Players[i] = p                             // 复制该参赛者的公开字段。
@@ -261,19 +275,9 @@ func (s *room) advance() string {
 			} // 跳过弃牌、全押和已完成动作的人。
 		}
 		if next >= 0 { // 本轮仍有行动机会。
-			h.Actor = next                   // 设置当前行动者。
-			h.Turn++                         // 创建新的行动标识。
-			if h.Players[next].ID != "bot" { // 真人行动需要等待客户端请求。
-				return "" // 本次推进成功，停止自动处理。
-			} // 等待真人请求。
-			action := "check"                      // 机器人默认过牌。
-			if h.Players[next].Street < h.Target { // 机器人欠当前目标时需要跟注。
-				action = "call" // 机器人选择跟注，金额由服务器计算。
-			} // 欠注时只跟注，不分析牌力或随机选择。
-			if rejection := s.act(action); rejection != "" { // 用相同规则立即执行机器人动作。
-				return rejection // 动作失败时向调用者报告错误。
-			} // 立即执行并按余额扣款，不等待动画。
-			continue // 机器人完成后继续推进。
+			h.Actor = next // 设置当前行动者。
+			h.Turn++       // 创建新的行动标识。
+			return ""      // 真人等待命令，机器人等待独立的实际思考期限。
 		}
 		switch h.Stage { // 所有人完成本轮后进入下一阶段。
 		case "preflop": // 翻牌前轮结束后进入翻牌。

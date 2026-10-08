@@ -78,6 +78,7 @@ function render(view) {
         if (participant.folded) badge.textContent += " · 弃牌";
         else if (participant.allIn) badge.textContent += " · 全押";
         if (view.hand.actor === player.id) badge.textContent += " · 当前行动";
+        if (player.id === "bot" && view.hand.botThinking) badge.textContent += " · 思考中";
         detail.textContent = `本局投入 ${participant.invested} · ${participant.hole?.length ? cardsText(participant.hole) : "🂠 🂠"}`;
         if (participant.strength) detail.textContent += ` · ${participant.strength.category}：${cardsText(participant.strength.cards)}`;
         if (view.hand.stage === "finished") detail.textContent += ` · 获得 ${participant.won} · 结算余额 ${participant.balance}`;
@@ -91,6 +92,7 @@ function render(view) {
   if (hand?.actor) {
     const actor = hand.players.find(player => player.id === hand.actor);
     gameInfo.textContent += ` · 当前行动：${actor?.id === view.bot.id ? "机器人" : `真人 ${(actor?.seat ?? 0) + 1}`}`;
+    if (hand.botThinking) gameInfo.textContent += " · 思考中";
   }
   actions.replaceChildren();
   if (view.host === view.you && (!hand || hand.stage === "finished") && !view.seats.some(player => player?.disconnectedUntil || player?.connectingUntil)) addAction("start", "开始新一局");

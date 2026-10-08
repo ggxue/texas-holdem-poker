@@ -26,18 +26,22 @@ func humanRoom(t *testing.T, humans int, options ...Options) (*httptest.Server, 
 			config.ActionStart = firstActionStart
 		}
 	}
+	if config.BotThinkSeconds == nil {
+		config.BotThinkSeconds = thinkSeconds(1)
+	}
 	app, err := NewWithOptions(config)
 	if err != nil {
 		t.Fatal(err)
 	}
 	server := httptest.NewServer(app)
+	registerClock(t, server.URL, clock)
 	t.Cleanup(func() { app.Close(); server.Close() })
 	clients := make([]*http.Client, humans)
 	sockets := make([]*websocket.Conn, humans)
 	for i := range clients {
 		clients[i] = browser(t)
 		before := gameState(t, clients[i], server.URL)
-		status, joined := gameCommand(t, clients[i], server.URL, "enter", "join", before)
+		status, joined := settledCommand(t, clients[i], server.URL, "enter", "join", before)
 		if status != http.StatusOK {
 			t.Fatalf("human %d entry: %d %+v", i+1, status, joined)
 		}
@@ -67,7 +71,7 @@ func TestUAC02OneToFiveHumansReceivePrivateCardsAndPayOneAnte(t *testing.T) {
 		t.Run(fmt.Sprint(tc.humans), func(t *testing.T) {
 			s, clients, sockets, _ := humanRoom(t, tc.humans)
 			before := gameState(t, clients[0], s.URL)
-			status, started := gameCommand(t, clients[0], s.URL, "start", "start", before)
+			status, started := settledCommand(t, clients[0], s.URL, "start", "start", before)
 			if status != http.StatusOK || started.Hand == nil || started.Hand.Pot != tc.pot || len(started.Hand.Players) != tc.humans+1 || started.Bot.Chips != 99 {
 				t.Fatalf("start/ante: %d %+v", status, started)
 			}
@@ -99,7 +103,7 @@ func TestUAC02OneToFiveHumansReceivePrivateCardsAndPayOneAnte(t *testing.T) {
 					seen[card] = true
 				}
 			}
-			status, retry := gameCommand(t, clients[0], s.URL, "start", "start", before)
+			status, retry := settledCommand(t, clients[0], s.URL, "start", "start", before)
 			if status != http.StatusOK || retry.Version != started.Version || gameState(t, clients[0], s.URL).Hand.Pot != tc.pot {
 				t.Fatal("start retry repeated ante or changed hand")
 			}
@@ -170,7 +174,7 @@ func TestUAC03FullRoomTakeoverPreservesTurnAndOldCloseIsHarmless(t *testing.T) {
 	if after.You != before.You || after.Seats[4].ID != before.You || after.Seats[4].Chips != 100 || after.Hand.ID != before.Hand.ID || after.Hand.Turn != before.Hand.Turn || after.Hand.Deadline != before.Hand.Deadline || after.Hand.Pot != 6 || len(after.Hand.Players) != 6 {
 		t.Fatalf("takeover changed seat, hand, ante or existing deadline: %+v", after)
 	}
-	status, denied := gameCommand(t, clients[4], s.URL, "old-action", "check", before)
+	status, denied := settledCommand(t, clients[4], s.URL, "old-action", "check", before)
 	if status != http.StatusConflict || denied.Error != "taken_over" {
 		t.Fatalf("old page action: %d %+v", status, denied)
 	}
@@ -191,7 +195,7 @@ func TestUAC03FullRoomTakeoverPreservesTurnAndOldCloseIsHarmless(t *testing.T) {
 	}
 	sockets[4].Close()
 	clock.advance(20 * time.Second)
-	current := gameState(t, newPage, s.URL)
+	current := finishBot(t, newPage, s.URL, gameState(t, newPage, s.URL))
 	if current.Seats[4] == nil || current.Seats[4].DisconnectedUntil != 0 || current.Seats[4].ConnectingUntil != 0 || current.Hand.Stage != "flop" || current.Hand.Actor != current.Seats[0].ID || current.Hand.Deadline != clock.Now().Add(30*time.Second).UnixMilli() || current.Hand.Players[4].Folded {
 		t.Fatalf("old close departed new page or original timeout failed: %+v", current)
 	}
@@ -223,7 +227,7 @@ func TestUAC04MidHandEntrantCannotInheritParticipationOrPrize(t *testing.T) {
 				}
 			}
 			before := gameState(t, newcomer, s.URL)
-			status, denied := gameCommand(t, newcomer, s.URL, "cannot-act", "check", before)
+			status, denied := settledCommand(t, newcomer, s.URL, "cannot-act", "check", before)
 			if status != http.StatusConflict || denied.Error != "not_your_turn" || denied.Version != before.Version || denied.Hand.Pot != before.Hand.Pot {
 				t.Fatalf("waiting entrant acted: %d %+v", status, denied)
 			}
@@ -298,7 +302,7 @@ func TestUAC01ConcurrentEntriesCannotOverfillOrDuplicateSeats(t *testing.T) {
 			defer wg.Done()
 			current := initial[i]
 			for attempt := 0; attempt < 8; attempt++ {
-				status, v := gameCommand(t, client, s.URL, fmt.Sprintf("enter-%d", attempt), "join", current)
+				status, v := settledCommand(t, client, s.URL, fmt.Sprintf("enter-%d", attempt), "join", current)
 				if v.Error != "stale_state" {
 					results <- entryResult{i, status, v}
 					return
