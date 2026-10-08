@@ -1,6 +1,6 @@
 # 12: 免费云运行与整体验收
 
-Status: ready-for-agent
+Status: blocked
 Type: implementation
 Spec: [当前规格](../spec.md)
 Blocked by: [05](05-balance-refill.md)、[08](08-disconnect-action-timers.md)
@@ -27,8 +27,18 @@ Primary acceptance cases: AC41–AC43
 
 ## Validation
 
-Implementation baseline: 实施前记录。
-尚未实施，没有云部署验收证据。
+Implementation baseline: 2536ef6be944db7c8531f53885f7a3c6efe663af。
+已完成显式免费单实例render.yaml、健康检查、运行文档、可复现浏览器和进程重启脚本，
+以及Windows race工具链。当前官方研究见[免费云研究](../free-web-research.md)。
+本地证据见[AC映射](../acceptance-evidence.md)：真实Chrome和模拟手机通过；新进程清空通过。
+实际云配置、HTTPS/WSS、休眠、实机和其他浏览器待执行，不标done。
+外部阻塞：项目无Git remote，无可用Render账号访问；已向用户询问仓库URL及免费账号入口。
+不得创建付费资源、数据库或额外保活。
+
+最终 verify.ps1 -Race 全部通过、退出0。双轴审查范围为baseline至本次暂存改动：
+Standards发现1项重启脚本握手拒绝挂起，修复并复查后0；Spec为0。
+正常脚本退出0，真实403拒绝实验退出1且清理子进程；最终Chrome复跑退出0。
+本地工作已完成，blocked仅指缺仓库/免费账号访问及后续真实云验收，不能标整体完成。
 
 ## Comments
 

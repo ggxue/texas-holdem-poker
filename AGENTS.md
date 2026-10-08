@@ -3,7 +3,7 @@
 ## Project and current phase
 
 Go backend and HTML/JS/CSS frontend for a single-room poker game.
-Room entry is implemented; hand gameplay is the next scoped ticket.
+Local gameplay tickets 03–08 are implemented; ticket 12 awaits real cloud access and acceptance.
 Before game implementation, read [.scratch/online-poker/spec.md](.scratch/online-poker/spec.md)
 and the selected ticket in [.scratch/online-poker/ticket-plan.md](.scratch/online-poker/ticket-plan.md).
 The current user decision is memory-only chips and reconnect reset to 100; its

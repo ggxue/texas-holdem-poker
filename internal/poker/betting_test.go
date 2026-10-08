@@ -64,7 +64,19 @@ func finishChecks(t *testing.T, clients [2]*http.Client, url string) gameView {
 func TestAC14And15OneBetAndEarlierCheckerResponds(t *testing.T) {
 	_, s, c, _ := bettingRoom(t, [3]int64{100, 100, 100})
 	do(t, c[0], s.URL, "check-first", "check")
-	v := do(t, c[1], s.URL, "bet", "bet")
+	beforeBet := gameState(t, c[1], s.URL)
+	status, v := gameCommand(t, c[1], s.URL, "bet", "bet", beforeBet)
+	if status != 200 {
+		t.Fatalf("bet: %d %+v", status, v)
+	}
+	status, retry := gameCommand(t, c[1], s.URL, "bet", "bet", beforeBet)
+	if status != 200 || retry.Version != v.Version || retry.Hand.Pot != v.Hand.Pot {
+		t.Fatal("AC34 lost-response retry repeated bet")
+	}
+	status, conflict := gameCommand(t, c[1], s.URL, "bet", "call", beforeBet)
+	if status != 409 || conflict.Error != "request_conflict" || conflict.Version != v.Version {
+		t.Fatal("AC34 same request ID changed contents")
+	}
 	if v.Hand.Pot != 23 || v.Hand.Target != 10 || v.Hand.Actor != gameState(t, c[0], s.URL).You || v.Bot.Chips != 89 {
 		t.Fatalf("bet and bot call: %+v", v.Hand)
 	}

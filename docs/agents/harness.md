@@ -1,7 +1,7 @@
 # Harness 使用与验证
 
 本仓库使用 Matt Pocock 的 skills、本地 Markdown 任务跟踪和可重复的验证入口。
-项目入口是 [AGENTS.md](../../AGENTS.md)。游戏范围、规则、数据库和网络协议仍待规划。
+项目入口是 [AGENTS.md](../../AGENTS.md)。当前游戏规则见[规格](../../.scratch/online-poker/spec.md)，运行仅用内存，不使用数据库。
 
 ## 日常入口
 
@@ -59,3 +59,11 @@ $wayfinder 帮我确定德州扑克后端第一版的范围和关键选择。
 初始化结果：harness 检查和 Go 构建通过；原始 main.go 的格式与 Println 诊断
 导致完整 Go 验证失败，已记录为一个 draft 任务。当前只读 CLI 的默认策略限制了
 探测会话的 shell 文件读取，磁盘配置由本次执行环境的验证脚本核对。
+
+
+## 当前实施验证补充
+
+Windows race 使用 scripts/bootstrap-race.ps1 安装校验过的 w64devkit；解压必须等待进程结束，
+不能把GUI自解压启动成功当作安装完成。当前 Go 全套和 race 已通过。
+真实 Chrome 需要沙箱允许其子进程，使用独立测试配置，不操作日常浏览器。
+[验收证据](../../.scratch/online-poker/acceptance-evidence.md)区分本地、手机模拟和未完成云验证。

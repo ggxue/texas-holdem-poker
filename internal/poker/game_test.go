@@ -214,10 +214,23 @@ func TestAC08And13HostStartsAndChecksToShowdown(t *testing.T) {
 				t.Fatalf("not settled: %+v", v.Hand)
 			}
 			won := int64(0)
+			seen := map[Card]bool{}
+			for _, card := range v.Hand.Board {
+				if seen[card] {
+					t.Fatal("AC08 duplicate public card")
+				}
+				seen[card] = true
+			}
 			for _, p := range v.Hand.Players {
 				won += p.Won
 				if len(p.Hole) != 2 || p.Strength == nil {
 					t.Fatalf("showdown visibility: %+v", p)
+				}
+				for _, card := range p.Hole {
+					if seen[card] {
+						t.Fatal("AC08 duplicate dealt card")
+					}
+					seen[card] = true
 				}
 			}
 			if won != int64(humans+1) {

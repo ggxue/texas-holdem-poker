@@ -35,5 +35,5 @@ Approval: 原12票已批准；2026-10-08按用户明确覆盖决定修订为9张
 - [10：重启恢复存档](issues/10-restart-recovery.md)：wontfix。
 - [11：跨进程存档所有权](issues/11-process-ownership.md)：wontfix。
 
-02内存修订已done；03实现及自动化检查通过，浏览器验收待12；当前frontier是04。其余状态以票据为准。
+02及03–08本地实施已done；当前frontier是12，免费配置和本地整体验证已完成，实际云访问及实机/其他浏览器验收待提供部署入口。详见[当前证据](acceptance-evidence.md)。
 云账号、部署权限及当前官方免费限制在12核实，历史研究不等于上线验证。

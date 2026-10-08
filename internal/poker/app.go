@@ -57,6 +57,16 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(5 * time.Second))
 	switch {
+	case r.URL.Path == "/healthz" && r.Method == http.MethodGet:
+		a.mu.Lock()
+		ok := !a.closed && a.fault == ""
+		a.mu.Unlock()
+		if !ok {
+			http.Error(w, "unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		_, _ = w.Write([]byte("ok\n"))
 	case r.URL.Path == "/api/state" && r.Method == http.MethodGet:
 		id, credential, err := a.identify(r)
 		if err != nil {

@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: texas-poker
+    runtime: go
+    plan: free
+    numInstances: 1
+    buildCommand: go version && go build -tags netgo -ldflags '-s -w' -o app .
+    startCommand: ./app
+    healthCheckPath: /healthz
+    autoDeployTrigger: "off"
+    envVars:
+      - key: CGO_ENABLED
+        value: "0"
+      - key: GOTOOLCHAIN
+        value: local

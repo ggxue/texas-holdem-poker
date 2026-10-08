@@ -112,6 +112,16 @@ try {
         $env:GOPATH = Join-Path $taskRoot '.tools/gopath'
         $env:GOTOOLCHAIN = 'local'
         $env:GOWORK = 'off'
+        if ($Race) {
+            $env:CGO_ENABLED = '1'
+            if (-not $env:CC) {
+                $taskRaceCompiler = Join-Path $taskRoot '.tools/w64devkit-2.10.0/w64devkit/bin/gcc.exe'
+                if (-not (Test-Path -LiteralPath $taskRaceCompiler)) {
+                    throw 'Race C compiler missing. Run scripts/bootstrap-race.ps1 or set CC to an installed supported compiler.'
+                }
+                $env:CC = $taskRaceCompiler
+            }
+        }
         New-Item -ItemType Directory -Path (Join-Path $taskRoot 'artifacts/build') -Force | Out-Null
         Invoke-Check 'Go toolchain' {
             $taskVersion = & $taskGoExe version
