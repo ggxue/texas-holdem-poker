@@ -28,6 +28,7 @@ type hand struct {
 	Board        []Card
 	Players      []participant
 	Actor        int
+	Start        int
 	Target       int64
 	deck         []Card
 	cursor       int
@@ -48,6 +49,15 @@ type handView struct {
 	CallAmount int64         `json:"callAmount"`
 	BetAmount  int64         `json:"betAmount"`
 	Deadline   int64         `json:"deadline"`
+	StartSeat  int           `json:"actionStartSeat"`
+}
+
+func randomActionStart(seats []int) (int, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(len(seats)))) // 从全部参赛候选中无偏等概率抽一个下标。
+	if err != nil {                                                // 随机源故障必须返回给开局事务。
+		return 0, err // 不以固定座位替代失败抽样。
+	} // 随机源失败时不开局。
+	return seats[int(n.Int64())], nil // 返回座位编号，空位不在候选内。
 }
 
 func validAction(action string) bool {
@@ -74,6 +84,7 @@ func shuffledDeck() ([]Card, error) {
 
 func (h *hand) visibleTo(id string) *handView {
 	v := &handView{ID: h.ID, Turn: h.Turn, Stage: h.Stage, Pot: h.Pot, Board: append([]Card{}, h.Board...), Target: h.Target, Players: make([]participant, len(h.Players))} // 构造独立的公开快照。
+	v.StartSeat = h.Players[h.Start].Seat                                                                                                                                   // 全局保留同一公开行动起点，包含已全押或离房者。
 	if !h.Deadline.IsZero() {                                                                                                                                               // 有有效行动机会时才公开期限。
 		v.Deadline = h.Deadline.UnixMilli() // 使用绝对毫秒时间，重连不会重新计时。
 	}
@@ -140,7 +151,24 @@ func (a *App) gameCommand(id string, cmd command) string {
 			} // 空位不参加。
 		}
 		h.Players = append(h.Players, participant{ID: "bot", Seat: humanSeatCount}) // 机器人固定在五个真人座位之后。
-		for i := range h.Players {                                                  // 每名参赛者只收一次底注并发两张牌。
+		seats := make([]int, len(h.Players))                                        // 固定名单中的所有参赛者均参与起点抽选。
+		for i, p := range h.Players {                                               // 收集所有本局参赛者，而非只收集可行动者。
+			seats[i] = p.Seat // 包含底注后全押者和机器人，排除空位及待局者。
+		} // 包含底注后全押者和机器人，排除空位及待局者。
+		startSeat, err := a.actionStart(seats) // 成功开局仅抽一次，不在轮转换或重连时重抽。
+		if err != nil {                        // 随机源故障不能收底注或替换已有结果。
+			return "unavailable" // 拒绝本次开局，由公开命令事务回滚。
+		} // 随机源错误时原子拒绝开局，不收底注。
+		h.Start = -1                  // 配置也必须返回本局候选中的有效座位。
+		for i, p := range h.Players { // 将候选座位定位到固定本局名单。
+			if p.Seat == startSeat { // 起点必须属于本局参赛者。
+				h.Start = i // 保存每轮和零头共用的唯一循环起点。
+			}
+		} // 保存固定名单中的起点下标。
+		if h.Start < 0 { // 离线配置返回非候选座位也不能开局。
+			return "unavailable" // 保持原余额、名单和底池不变。
+		} // 不接受非参赛座位作为起点。
+		for i := range h.Players { // 每名参赛者只收一次底注并发两张牌。
 			p := &h.Players[i]        // 取得当前参赛者。
 			if s.balance(p.ID) == 0 { // 只有本次参赛者余额归零才免费补给。
 				s.setBalance(p.ID, 100) // 下一局底注前补到100，不给正余额增加筹码。
@@ -219,11 +247,15 @@ func (s *room) advance() string {
 		if h.Actor >= 0 && !h.Players[h.Actor].Folded && !h.Players[h.Actor].AllIn && !h.Players[h.Actor].acted { // 他人退出不重置当前合法机会。
 			return "" // 保留原行动者及行动标识。
 		}
-		next := -1                                            // 查找固定顺序下尚未行动的玩家。
+		next := -1       // 查找固定顺序下尚未行动的玩家。
+		after := h.Actor // 已有轮内行动时从上一行动者之后继续。
+		if after < 0 {   // 新轮尚无上一行动者，必须沿用本局起点。
+			after = h.Start - 1 // 扫描偏移从起点之前开始，使首候选为起点。
+		} // 每轮首次扫描从同一本局起点开始。
 		for offset := 1; offset <= len(h.Players); offset++ { // 固定顺序继续，轮末再回应此前过牌者。
-			i := (h.Actor + offset) % len(h.Players) // 从上一行动者之后开始查找。
-			p := h.Players[i]                        // 读取该位置的本轮状态。
-			if !p.Folded && !p.AllIn && !p.acted {   // 寻找仍需行动的有效玩家。
+			i := (after + offset) % len(h.Players) // 按固定座位循环跳过不具行动资格者。
+			p := h.Players[i]                      // 读取该位置的本轮状态。
+			if !p.Folded && !p.AllIn && !p.acted { // 寻找仍需行动的有效玩家。
 				next = i // 保存下一名行动者下标。
 				break    // 找到第一名后停止扫描。
 			} // 跳过弃牌、全押和已完成动作的人。
@@ -257,7 +289,7 @@ func (s *room) advance() string {
 			return s.settle(true) // 河牌轮结束摊牌。
 		}
 		h.Target = 0               // 新轮没有下注目标。
-		h.Actor = -1               // 新轮从真人1重新扫描，空位跳过。
+		h.Actor = -1               // 新轮沿本局已确定起点扫描，空位跳过。
 		for i := range h.Players { // 依次更新各参赛者。
 			h.Players[i].acted = false // 新轮重新允许玩家行动。
 			h.Players[i].Street = 0    // 清空本轮投入，不改变总投入。
@@ -297,7 +329,17 @@ func (s *room) settle(showdown bool) string {
 		return "no_winner" // 无赢家时报告状态故障。
 	} // 无有效玩家时不得凭空分配。
 	share, remainder := h.Pot/int64(len(winners)), h.Pot%int64(len(winners)) // 整数平分并保留零头。
-	for j, i := range winners {                                              // 先检查所有入账是否会溢出。
+	ordered := make([]int, 0, len(winners))                                  // 零头只给赢家，顺序沿本局起点循环。
+	for offset := 0; offset < len(h.Players); offset++ {                     // 起点即使已离房仍保留，不重新抽选。
+		i := (h.Start + offset) % len(h.Players) // 与每轮行动使用同一个座位循环。
+		for _, winner := range winners {         // 过滤非赢家和空位，不按下注额度分层。
+			if winner == i { // 该循环位置确为并列最强赢家才可分零头。
+				ordered = append(ordered, i) // 每人一次，零头不会发给非赢家。
+			} // 每名赢家仅出现一次，最多多得一枚。
+		}
+	}
+	winners = ordered           // 后续溢出检查和入账共用同一奖项顺序。
+	for j, i := range winners { // 先检查所有入账是否会溢出。
 		gain := share             // 每名赢家先取得平分份额。
 		if int64(j) < remainder { // 只向排在零头范围内的赢家多分一枚。
 			gain++ // 增加一枚零头筹码。

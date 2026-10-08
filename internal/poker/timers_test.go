@@ -57,7 +57,7 @@ func (c *manualClock) advance(d time.Duration) {
 func clockRoom(t *testing.T, humans int, balances ...[3]int64) (*httptest.Server, [2]*http.Client, *manualClock, [2]*websocket.Conn, gameView) {
 	t.Helper()
 	clock := newClock()
-	app, e := NewWithOptions(Options{Deck: fixedDeck(nil), Clock: clock})
+	app, e := NewWithOptions(Options{Deck: fixedDeck(nil), Clock: clock, ActionStart: firstActionStart})
 	if e != nil {
 		t.Fatal(e)
 	}

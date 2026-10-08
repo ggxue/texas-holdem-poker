@@ -12,10 +12,21 @@ import (
 )
 
 // The fixture controls only cards and time; assertions cross HTTP and WebSocket.
-func humanRoom(t *testing.T, humans int) (*httptest.Server, []*http.Client, []*websocket.Conn, *manualClock) {
+func humanRoom(t *testing.T, humans int, options ...Options) (*httptest.Server, []*http.Client, []*websocket.Conn, *manualClock) {
 	t.Helper()
 	clock := newClock()
-	app, err := NewWithOptions(Options{Deck: fixedDeck(nil), Clock: clock})
+	config := Options{Deck: fixedDeck(nil), Clock: clock, ActionStart: firstActionStart}
+	if len(options) > 0 {
+		config = options[0]
+		config.Clock = clock
+		if config.Deck == nil {
+			config.Deck = fixedDeck(nil)
+		}
+		if config.ActionStart == nil {
+			config.ActionStart = firstActionStart
+		}
+	}
+	app, err := NewWithOptions(config)
 	if err != nil {
 		t.Fatal(err)
 	}

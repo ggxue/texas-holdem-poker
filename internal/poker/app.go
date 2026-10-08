@@ -12,24 +12,26 @@ import (
 
 // App owns the single room and all its process-local state.
 type App struct {
-	mu       sync.Mutex
-	state    room
-	requests map[string]receipt
-	secret   []byte
-	clients  map[*connection]struct{}
-	closed   bool
-	deck     func() ([]Card, error)
-	active   map[string]*connection
-	clock    Clock
-	timer    Timer
-	wake     *int
-	fault    string
+	mu          sync.Mutex
+	state       room
+	requests    map[string]receipt
+	secret      []byte
+	clients     map[*connection]struct{}
+	closed      bool
+	deck        func() ([]Card, error)
+	actionStart func([]int) (int, error)
+	active      map[string]*connection
+	clock       Clock
+	timer       Timer
+	wake        *int
+	fault       string
 }
 
-// Options supplies an offline deterministic deck seam; HTTP never accepts cards.
+// Options controls cards, time and action-start randomness offline, never via HTTP.
 type Options struct {
-	Deck  func() ([]Card, error)
-	Clock Clock
+	Deck        func() ([]Card, error)
+	Clock       Clock
+	ActionStart func([]int) (int, error)
 }
 
 func New() (*App, error) { return NewWithOptions(Options{}) }
@@ -47,7 +49,11 @@ func NewWithOptions(options Options) (*App, error) {
 	if clock == nil {
 		clock = systemClock{}
 	}
-	return &App{state: room{Accounts: map[string]player{}, Bot: player{ID: "bot", Chips: 100}, Controls: map[string]controller{}, Disconnected: map[string]time.Time{}, Connecting: map[string]time.Time{}}, requests: map[string]receipt{}, secret: secret, clients: map[*connection]struct{}{}, active: map[string]*connection{}, deck: deck, clock: clock}, nil
+	actionStart := options.ActionStart
+	if actionStart == nil {
+		actionStart = randomActionStart
+	}
+	return &App{state: room{Accounts: map[string]player{}, Bot: player{ID: "bot", Chips: 100}, Controls: map[string]controller{}, Disconnected: map[string]time.Time{}, Connecting: map[string]time.Time{}}, requests: map[string]receipt{}, secret: secret, clients: map[*connection]struct{}{}, active: map[string]*connection{}, deck: deck, clock: clock, actionStart: actionStart}, nil
 }
 
 func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {

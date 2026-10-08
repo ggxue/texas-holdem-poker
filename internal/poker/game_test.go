@@ -17,16 +17,17 @@ type gameView struct {
 	Seats   []*playerView `json:"seats"`
 	Bot     playerView    `json:"bot"`
 	Hand    *struct {
-		ID       int64    `json:"id"`
-		Turn     int64    `json:"turn"`
-		Actor    string   `json:"actor"`
-		Stage    string   `json:"stage"`
-		Pot      int64    `json:"pot"`
-		Target   int64    `json:"target"`
-		Legal    []string `json:"legal"`
-		Deadline int64    `json:"deadline"`
-		Board    []Card   `json:"board"`
-		Players  []struct {
+		ID        int64    `json:"id"`
+		Turn      int64    `json:"turn"`
+		Actor     string   `json:"actor"`
+		Stage     string   `json:"stage"`
+		Pot       int64    `json:"pot"`
+		Target    int64    `json:"target"`
+		Legal     []string `json:"legal"`
+		Deadline  int64    `json:"deadline"`
+		StartSeat int      `json:"actionStartSeat"`
+		Board     []Card   `json:"board"`
+		Players   []struct {
 			ID       string    `json:"id"`
 			Seat     int       `json:"seat"`
 			Hole     []Card    `json:"hole"`
@@ -59,9 +60,17 @@ func fixedDeck(prefix []Card) func() ([]Card, error) {
 		return cards, nil
 	}
 }
-func fixtureServer(t *testing.T, prefix []Card) (*App, *httptest.Server) {
+func fixtureServer(t *testing.T, prefix []Card, options ...Options) (*App, *httptest.Server) {
 	t.Helper()
-	app, e := NewWithOptions(Options{Deck: fixedDeck(prefix)})
+	config := Options{Deck: fixedDeck(prefix), ActionStart: firstActionStart}
+	if len(options) > 0 {
+		config = options[0]
+		config.Deck = fixedDeck(prefix)
+		if config.ActionStart == nil {
+			config.ActionStart = firstActionStart
+		}
+	}
+	app, e := NewWithOptions(config)
 	if e != nil {
 		t.Fatal(e)
 	}

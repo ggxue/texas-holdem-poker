@@ -57,6 +57,14 @@ async function action(page, label) {
   await evaluate(page, `(${selector}).click()`);
   await wait(page, `confirmed.version > ${before} && !sending`, `${label} acknowledged`);
 }
+async function currentHuman(pages) {
+  const end = Date.now() + 12000;
+  while (Date.now() < end) {
+    for (const page of pages) if (await evaluate(page, 'confirmed?.hand?.actor === confirmed?.you && !sending')) return page;
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+  throw new Error('No current human action became available');
+}
 function assert(condition, message) { if (!condition) throw new Error(message); }
 async function screenshot(page, name) {
   assert(await evaluate(page, 'document.documentElement.scrollWidth <= innerWidth'), 'horizontal overflow');
@@ -98,11 +106,13 @@ try {
   const sixth = await openPage(390);
   await wait(sixth, "document.getElementById('status').textContent.includes('房间已满')", 'room full');
   report.cases.push('five human seats, sixth identity room-full, empty/own/waiting markers, fixed bot identity');
-  assert(await evaluate(first, "document.getElementById('actions').textContent.includes('下注 10')"), 'bet amount missing');
-  await action(first, '下注');
-  await wait(second, "document.getElementById('actions').textContent.includes('跟注 10')", 'call amount');
-  await action(second, '跟注');
-  for (let i = 0; i < 3; i++) { await action(first, '过牌'); await action(second, '过牌'); }
+  const bettor = await currentHuman([first, second]);
+  assert(await evaluate(bettor, "document.getElementById('actions').textContent.includes('下注 10')"), 'bet amount missing');
+  await action(bettor, '下注');
+  const caller = await currentHuman([first, second]);
+  await wait(caller, "document.getElementById('actions').textContent.includes('跟注 10')", 'call amount');
+  await action(caller, '跟注');
+  for (let i = 0; i < 6; i++) await action(await currentHuman([first, second]), '过牌');
   assert((await state(first)).hand.stage === 'finished', 'three player game did not settle');
   await screenshot(first, 'poker-desktop');
   await screenshot(second, 'poker-mobile');
@@ -116,12 +126,13 @@ try {
   await send('Target.closeTarget', {targetId:first.target});
   await action(replacement, '开始');
   assert((await state(replacement)).hand.players.length === 6, 'five humans + fixed bot did not start');
-  await action(replacement, '弃牌');
-  await action(second, '弃牌');
-  await action(third, '弃牌');
-  assert(await evaluate(fourth, "document.getElementById('game-info').textContent.includes('当前行动：真人 4')"), 'new human action label missing');
-  await action(fourth, '弃牌');
-  await action(fifth, '弃牌');
+  for (let i = 0; i < 5; i++) {
+    const actor = await currentHuman([replacement, second, third, fourth, fifth]);
+    const actorState = await state(actor);
+    const seat = actorState.hand.players.find(player => player.id === actorState.you).seat;
+    assert(await evaluate(actor, `document.getElementById('game-info').textContent.includes('当前行动：真人 ${seat+1}')`), 'human action label missing');
+    await action(actor, '弃牌');
+  }
   assert((await state(second)).hand.stage === 'finished', 'fold game not finished');
   report.cases.push('same-cookie takeover, old page stopped reconnect, old close harmless, manual next hand/fold');
   await action(replacement, '退出');

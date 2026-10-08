@@ -30,7 +30,7 @@ type roomView struct {
 
 func testServer(t *testing.T) *httptest.Server {
 	t.Helper()
-	app, err := New()
+	app, err := NewWithOptions(Options{ActionStart: firstActionStart})
 	if err != nil {
 		t.Fatal(err)
 	}
