@@ -23,7 +23,9 @@ func bettingRoom(t *testing.T, balances [3]int64) (*App, *httptest.Server, [2]*h
 	// 已确认的非公开余额fixture；行为断言只经公开命令及视图。
 	app.mu.Lock()
 	for i, id := range app.state.Seats {
-		app.state.setBalance(id, balances[i])
+		if id != "" {
+			app.state.setBalance(id, balances[i])
+		}
 	}
 	app.state.Bot.Chips = balances[2]
 	app.mu.Unlock()

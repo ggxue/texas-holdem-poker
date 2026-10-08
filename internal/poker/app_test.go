@@ -19,13 +19,13 @@ type playerView struct {
 }
 
 type roomView struct {
-	Version int64          `json:"version"`
-	You     string         `json:"you"`
-	Host    string         `json:"host"`
-	Seats   [2]*playerView `json:"seats"`
-	Bot     playerView     `json:"bot"`
-	Error   string         `json:"error"`
-	Control int64          `json:"control"`
+	Version int64         `json:"version"`
+	You     string        `json:"you"`
+	Host    string        `json:"host"`
+	Seats   []*playerView `json:"seats"`
+	Bot     playerView    `json:"bot"`
+	Error   string        `json:"error"`
+	Control int64         `json:"control"`
 }
 
 func testServer(t *testing.T) *httptest.Server {
@@ -90,30 +90,37 @@ func join(t *testing.T, client *http.Client, address, requestID string, version 
 
 func pageID(c *http.Client) string { return fmt.Sprintf("page-%p", c) }
 
-func TestAC07TwoHumansEnterAndThirdHumanIsRejected(t *testing.T) {
+func TestUAC01FiveHumansEnterAndSixthHumanIsRejected(t *testing.T) {
 	server := testServer(t)
-	first, second, third := browser(t), browser(t), browser(t)
-	initial := getRoom(t, first, server.URL)
-	status, one := join(t, first, server.URL, "join-one", initial.Version)
-	if status != http.StatusOK {
-		t.Fatalf("first join: %d %+v", status, one)
+	clients := make([]*http.Client, 5)
+	identities := make([]string, 5)
+	for i := range clients {
+		clients[i] = browser(t)
+		before := getRoom(t, clients[i], server.URL)
+		identities[i] = before.You
+		status, entered := join(t, clients[i], server.URL, "enter", before.Version)
+		if status != http.StatusOK {
+			t.Fatalf("human %d join: %d %+v", i+1, status, entered)
+		}
+		if entered.Seats[i] == nil || entered.Seats[i].ID != before.You || entered.Seats[i].Chips != 100 || entered.Host != identities[0] {
+			t.Fatalf("human %d seat/host assignment: %+v", i+1, entered)
+		}
 	}
-	secondInitial := getRoom(t, second, server.URL)
-	status, two := join(t, second, server.URL, "join-two", secondInitial.Version)
-	if status != http.StatusOK {
-		t.Fatalf("second join: %d %+v", status, two)
-	}
-	if two.Seats[0] == nil || two.Seats[0].ID != initial.You || two.Seats[1] == nil || two.Seats[1].ID != secondInitial.You || two.Host != initial.You {
-		t.Fatalf("seat/host assignment: %+v", two)
-	}
-	thirdInitial := getRoom(t, third, server.URL)
-	status, full := join(t, third, server.URL, "join-three", thirdInitial.Version)
+	before := getRoom(t, clients[0], server.URL)
+	sixth := browser(t)
+	sixthInitial := getRoom(t, sixth, server.URL)
+	status, full := join(t, sixth, server.URL, "full", sixthInitial.Version)
 	if status != http.StatusConflict || full.Error != "room_full" {
-		t.Fatalf("third join: %d %+v", status, full)
+		t.Fatalf("sixth join: %d %+v", status, full)
 	}
-	unchanged := getRoom(t, first, server.URL)
-	if unchanged.Seats[0] == nil || unchanged.Seats[1] == nil || unchanged.Seats[0].ID != initial.You || unchanged.Seats[1].ID != secondInitial.You || unchanged.Host != initial.You {
-		t.Fatalf("third identity displaced occupants: %+v", unchanged)
+	unchanged := getRoom(t, clients[0], server.URL)
+	if unchanged.Version != before.Version || unchanged.Host != identities[0] {
+		t.Fatalf("rejected entry changed room: %+v", unchanged)
+	}
+	for i, id := range identities {
+		if unchanged.Seats[i] == nil || unchanged.Seats[i].ID != id {
+			t.Fatalf("sixth identity displaced human %d: %+v", i+1, unchanged)
+		}
 	}
 }
 func TestAC25ReconnectResetsChipsAndMissingCookieCreatesNewIdentity(t *testing.T) {

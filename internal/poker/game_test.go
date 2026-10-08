@@ -9,13 +9,13 @@ import (
 )
 
 type gameView struct {
-	Version int64          `json:"version"`
-	You     string         `json:"you"`
-	Host    string         `json:"host"`
-	Error   string         `json:"error"`
-	Control int64          `json:"control"`
-	Seats   [2]*playerView `json:"seats"`
-	Bot     playerView     `json:"bot"`
+	Version int64         `json:"version"`
+	You     string        `json:"you"`
+	Host    string        `json:"host"`
+	Error   string        `json:"error"`
+	Control int64         `json:"control"`
+	Seats   []*playerView `json:"seats"`
+	Bot     playerView    `json:"bot"`
 	Hand    *struct {
 		ID       int64    `json:"id"`
 		Turn     int64    `json:"turn"`
@@ -28,12 +28,14 @@ type gameView struct {
 		Board    []Card   `json:"board"`
 		Players  []struct {
 			ID       string    `json:"id"`
+			Seat     int       `json:"seat"`
 			Hole     []Card    `json:"hole"`
 			Invested int64     `json:"invested"`
 			Street   int64     `json:"street"`
 			Folded   bool      `json:"folded"`
 			AllIn    bool      `json:"allIn"`
 			Won      int64     `json:"won"`
+			Balance  int64     `json:"balance"`
 			Strength *Strength `json:"strength"`
 		} `json:"players"`
 	} `json:"hand"`

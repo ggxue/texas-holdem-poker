@@ -2,19 +2,22 @@ package poker
 
 import "time"
 
+const humanSeatCount = 5
+
 type player struct {
 	ID                string `json:"id"`
 	Chips             int64  `json:"chips"`
 	DisconnectedUntil int64  `json:"disconnectedUntil,omitempty"`
 	ConnectingUntil   int64  `json:"connectingUntil,omitempty"`
+	joinedVersion     int64
 }
 
 type room struct {
-	Version      int64             `json:"version"`
-	Accounts     map[string]player `json:"accounts"`
-	Seats        [2]string         `json:"seats"`
-	Host         string            `json:"host"`
-	Bot          player            `json:"bot"`
+	Version      int64                  `json:"version"`
+	Accounts     map[string]player      `json:"accounts"`
+	Seats        [humanSeatCount]string `json:"seats"`
+	Host         string                 `json:"host"`
+	Bot          player                 `json:"bot"`
 	Hand         *hand
 	Controls     map[string]controller
 	Disconnected map[string]time.Time
@@ -28,15 +31,15 @@ type controller struct {
 }
 
 type view struct {
-	Version    int64      `json:"version"`
-	You        string     `json:"you"`
-	Host       string     `json:"host"`
-	Seats      [2]*player `json:"seats"`
-	Bot        player     `json:"bot"`
-	Error      string     `json:"error,omitempty"`
-	Hand       *handView  `json:"hand,omitempty"`
-	Control    int64      `json:"control"`
-	ServerTime int64      `json:"serverTime"`
+	Version    int64                   `json:"version"`
+	You        string                  `json:"you"`
+	Host       string                  `json:"host"`
+	Seats      [humanSeatCount]*player `json:"seats"`
+	Bot        player                  `json:"bot"`
+	Error      string                  `json:"error,omitempty"`
+	Hand       *handView               `json:"hand,omitempty"`
+	Control    int64                   `json:"control"`
+	ServerTime int64                   `json:"serverTime"`
 }
 
 func (s room) visibleTo(id string) view {

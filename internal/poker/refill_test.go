@@ -11,7 +11,9 @@ func TestAC24OnlyZeroBalanceRefillsBeforeNextHand(t *testing.T) {
 			// 已确认的结算余额fixture；仅通过下一局公开命令断言。
 			app.mu.Lock()
 			for i, id := range app.state.Seats {
-				app.state.setBalance(id, balances[i])
+				if id != "" {
+					app.state.setBalance(id, balances[i])
+				}
 			}
 			app.state.Bot.Chips = balances[2]
 			app.mu.Unlock()

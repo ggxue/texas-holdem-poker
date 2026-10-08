@@ -139,8 +139,8 @@ func (a *App) gameCommand(id string, cmd command) string {
 				h.Players = append(h.Players, participant{ID: occupant, Seat: seat}) // 将真人身份固定在本局名单。
 			} // 空位不参加。
 		}
-		h.Players = append(h.Players, participant{ID: "bot", Seat: 2}) // 每局固定一个机器人。
-		for i := range h.Players {                                     // 每名参赛者只收一次底注并发两张牌。
+		h.Players = append(h.Players, participant{ID: "bot", Seat: humanSeatCount}) // 机器人固定在五个真人座位之后。
+		for i := range h.Players {                                                  // 每名参赛者只收一次底注并发两张牌。
 			p := &h.Players[i]        // 取得当前参赛者。
 			if s.balance(p.ID) == 0 { // 只有本次参赛者余额归零才免费补给。
 				s.setBalance(p.ID, 100) // 下一局底注前补到100，不给正余额增加筹码。
@@ -404,10 +404,9 @@ func (s *room) release(id string) string {
 	s.Seats[seat] = ""         // 立即释放座位，剩余余额仍绑定原身份。
 	if s.Host == id {          // 房主离开后自动交接。
 		s.Host = ""                        // 默认无真人时没有房主。
-		for _, occupant := range s.Seats { // 最多只剩一名真人，保持其原座位。
-			if occupant != "" { // 找到仍在房间的人。
-				s.Host = occupant // 把房主交给留房真人。
-				break             // 完成交接后停止查找。
+		for _, occupant := range s.Seats { // 检查全部留房真人，保持其原座位。
+			if occupant != "" && (s.Host == "" || s.Accounts[occupant].joinedVersion < s.Accounts[s.Host].joinedVersion) { // 比较本次占座先后，不使用座位编号。
+				s.Host = occupant // 房主交给最早入房且仍在房的真人。
 			}
 		}
 	}

@@ -59,11 +59,11 @@ function render(view) {
     const card = document.createElement("article");
     card.className = "seat" + (player && player.id === view.you ? " mine" : "");
     const name = document.createElement("h2");
-    name.textContent = i === 2 ? "机器人" : `真人 ${i + 1}`;
+    name.textContent = i === view.seats.length ? "机器人" : `真人 ${i + 1}`;
     card.append(name);
     const chips = document.createElement("div");
     chips.className = player ? "chips" : "empty";
-    chips.textContent = player ? `${player.chips} 筹码` : "等待玩家入房";
+    chips.textContent = player ? `${player.chips} 筹码` : "空位 · 等待玩家入房";
     card.append(chips);
     if (player) {
       const badge = document.createElement("div");
@@ -90,7 +90,7 @@ function render(view) {
   gameInfo.textContent = hand ? `${stageNames[hand.stage]} · 底池 ${hand.pot} · 公共牌 ${cardsText(hand.board) || "尚未发牌"}` : "等待房主开始 · 每人底注 1";
   if (hand?.actor) {
     const actor = hand.players.find(player => player.id === hand.actor);
-    gameInfo.textContent += ` · 当前行动：${actor?.seat === 2 ? "机器人" : `真人 ${(actor?.seat ?? 0) + 1}`}`;
+    gameInfo.textContent += ` · 当前行动：${actor?.id === view.bot.id ? "机器人" : `真人 ${(actor?.seat ?? 0) + 1}`}`;
   }
   actions.replaceChildren();
   if (view.host === view.you && (!hand || hand.stage === "finished") && !view.seats.some(player => player?.disconnectedUntil || player?.connectingUntil)) addAction("start", "开始新一局");

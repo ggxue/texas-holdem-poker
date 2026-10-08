@@ -83,8 +83,12 @@ func (a *App) apply(id string, cmd command) (outcome, bool) {
 	} else if control.PageID == cmd.PageID && control.Generation != cmd.Control {
 		rejection = "taken_over"
 	} else {
-		// A fresh successful entry resets the available balance, including reconnects.
-		a.state.Accounts[id] = player{ID: id, Chips: 100}
+		// 每次成功的新入房请求（含重连）将可用余额设100，入房先后另行保留。
+		joinedVersion := a.state.Version + 1 // 以串行确认版本记录本次占座先后，不受低号空位影响。
+		if a.state.Seats[seat] == id {       // 同身份重连或接管仍是原来的在房成员。
+			joinedVersion = a.state.Accounts[id].joinedVersion // 保留原入房先后，不能因设100而改动。
+		}
+		a.state.Accounts[id] = player{ID: id, Chips: 100, joinedVersion: joinedVersion} // 设100并保存已确定的本次占座顺序。
 		a.state.Seats[seat] = id
 		if a.state.Host == "" {
 			a.state.Host = id
