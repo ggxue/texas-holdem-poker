@@ -11,6 +11,8 @@ type command struct {
 	RequestID string `json:"requestID"`
 	Version   int64  `json:"version"`
 	Action    string `json:"action"`
+	HandID    int64  `json:"handID,omitempty"`
+	TurnID    int64  `json:"turnID,omitempty"`
 }
 
 type outcome struct {
@@ -57,6 +59,14 @@ func (a *App) apply(id string, cmd command) (outcome, bool) {
 		rejection = "stale_state"
 	} else if a.state.Version == math.MaxInt64 {
 		rejection = "version_exhausted"
+	} else if cmd.Action != "join" {
+		original := a.state.clone()
+		rejection = a.gameCommand(id, cmd)
+		if rejection == "" {
+			a.state.Version++
+		} else {
+			a.state = original
+		}
 	} else if seat < 0 {
 		rejection = "room_full"
 	} else {

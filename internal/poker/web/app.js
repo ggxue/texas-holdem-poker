@@ -2,6 +2,13 @@
 const statusLine = document.getElementById("status");
 const seats = document.getElementById("seats");
 const retryButton = document.getElementById("retry");
+const gameInfo = document.getElementById("game-info");
+const actions = document.getElementById("actions");
+let sending = false;
+const ranks = {11: "J", 12: "Q", 13: "K", 14: "A"};
+const suitNames = ["♦", "♣", "♥", "♠"];
+const stageNames = {preflop: "翻牌前", flop: "翻牌", turn: "转牌", river: "河牌", finished: "本局结束"};
+function cardsText(cards) { return cards.map(card => `${suitNames[card.suit]}${ranks[card.rank] || card.rank}`).join(" "); }
 let confirmed = null;
 let socket = null;
 let reconnectTimer = null;
@@ -15,6 +22,12 @@ const messages = {
   identity_required: "身份凭证已失效，请重新连接。",
   invalid_command: "操作无效，请重新连接。",
   origin_denied: "此页面不能操作该房间。",
+  host_only: "只有房主可以开局。",
+  hand_active: "请先完成当前牌局。",
+  stale_turn: "行动机会已更新，请按当前状态操作。",
+  not_your_turn: "尚未轮到你。",
+  no_active_hand: "请等待房主开始新一局。",
+  invalid_action: "当前不能执行该操作。",
 };
 function render(view) {
   if (view.error) { statusLine.textContent = messages[view.error] || "暂时无法完成操作。"; return; }
@@ -36,9 +49,44 @@ function render(view) {
       badge.className = "badge";
       badge.textContent = [player.id === view.you ? "你" : "", player.id === view.host ? "房主" : ""].filter(Boolean).join(" · ");
       card.append(badge);
+      const participant = view.hand?.players.find(item => item.id === player.id);
+      const detail = document.createElement("p");
+      if (participant) {
+        detail.textContent = `本局投入 ${participant.invested} · ${participant.hole?.length ? cardsText(participant.hole) : "🂠 🂠"}`;
+        if (participant.strength) detail.textContent += ` · ${participant.strength.category}：${cardsText(participant.strength.cards)}`;
+        if (view.hand.stage === "finished") detail.textContent += ` · 获得 ${participant.won} · 结算余额 ${participant.balance}`;
+      } else detail.textContent = view.hand && view.hand.stage !== "finished" ? "等待下一局" : "准备开局";
+      card.append(detail);
     }
     seats.append(card);
   });
+  const hand = view.hand;
+  gameInfo.textContent = hand ? `${stageNames[hand.stage]} · 底池 ${hand.pot} · 公共牌 ${cardsText(hand.board) || "尚未发牌"}` : "等待房主开始 · 每人底注 1";
+  actions.replaceChildren();
+  if (view.host === view.you && (!hand || hand.stage === "finished")) addAction("start", "开始新一局");
+  for (const action of hand?.legal || []) addAction(action, {check: "过牌"}[action] || action);
+}
+function addAction(action, label) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = label;
+  button.disabled = sending;
+  button.addEventListener("click", () => sendAction(action));
+  actions.append(button);
+}
+async function sendAction(action) {
+  if (sending || !confirmed) return;
+  sending = true;
+  const command = {requestID: crypto.randomUUID(), version: confirmed.version, action,
+    handID: confirmed.hand?.id || 0, turnID: confirmed.hand?.turn || 0};
+  render(confirmed);
+  try {
+    const response = await fetch("/api/command", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(command)});
+    const result = await response.json();
+    render(result);
+    if (result.error) await state();
+  } catch { statusLine.textContent = "操作结果待确认，请重新连接查看服务器状态。"; }
+  finally { sending = false; if (confirmed) render(confirmed); }
 }
 async function state() {
   const response = await fetch("/api/state", { cache: "no-store" });

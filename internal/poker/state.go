@@ -11,6 +11,7 @@ type room struct {
 	Seats    [2]string         `json:"seats"`
 	Host     string            `json:"host"`
 	Bot      player            `json:"bot"`
+	Hand     *hand
 }
 
 type view struct {
@@ -20,10 +21,14 @@ type view struct {
 	Seats   [2]*player `json:"seats"`
 	Bot     player     `json:"bot"`
 	Error   string     `json:"error,omitempty"`
+	Hand    *handView  `json:"hand,omitempty"`
 }
 
 func (s room) visibleTo(id string) view {
 	v := view{Version: s.Version, You: id, Host: s.Host, Bot: s.Bot}
+	if s.Hand != nil {
+		v.Hand = s.Hand.visibleTo(id)
+	}
 	for i, occupant := range s.Seats {
 		if occupant != "" {
 			p := s.Accounts[occupant]
@@ -31,4 +36,20 @@ func (s room) visibleTo(id string) view {
 		}
 	}
 	return v
+}
+
+// clone creates the rollback boundary for one atomic in-memory command.
+func (s room) clone() room {
+	c := s
+	c.Accounts = make(map[string]player, len(s.Accounts))
+	for id, p := range s.Accounts {
+		c.Accounts[id] = p
+	}
+	if s.Hand != nil {
+		h := *s.Hand
+		h.Players = append([]participant(nil), s.Hand.Players...)
+		h.Board = append([]Card(nil), s.Hand.Board...)
+		c.Hand = &h
+	}
+	return c
 }

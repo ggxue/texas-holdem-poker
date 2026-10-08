@@ -2,7 +2,7 @@
 
 > 当前覆盖：状态只在单进程内存中；重新入房本人余额设100；原有数据库提交/真实数据库fixture/跨重启持久性条款已撤销，不执行。游戏规则和公开seam沿用修订spec；详见[当前决定](../memory-reset-decision.md)。
 
-Status: ready-for-agent
+Status: in-progress
 Type: implementation
 Spec: [在线德州扑克首版规格](../spec.md)
 Blocked by: [02](02-persistent-room-entry.md)
@@ -31,7 +31,7 @@ Primary acceptance cases: AC01–AC06、AC08、AC13、AC22
 
 ## Validation
 
-Implementation baseline: 待实施开始、任何代码编辑前记录 SHA。
+Implementation baseline: 31a11cdd2a17c76741a9fde2f908b91732d49dc8。
 
 尚未实施，本次发布不构成游戏验收通过。
 按[项目验证约定](../../../docs/agents/harness.md)记录命令、退出码、目标 RED/GREEN、
