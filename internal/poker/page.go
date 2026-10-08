@@ -17,6 +17,8 @@ func servePage(w http.ResponseWriter, r *http.Request) {
 		file = "index.html"
 	case "/app.js":
 		file = "app.js"
+	case "/cards.js": // 卡片与静态牌型参考共用同一呈现模块。
+		file = "cards.js" // 仍只提供固定白名单静态文件。
 	case "/style.css":
 		file = "style.css"
 	default:

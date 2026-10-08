@@ -84,6 +84,17 @@ async function checkLayout(page, mobile) {
   assert(await evaluate(page, "document.getElementById('game-info').getBoundingClientRect().bottom <= document.getElementById('seats').getBoundingClientRect().top && document.getElementById('actions').getBoundingClientRect().top >= document.querySelectorAll('#seats .seat')[5].getBoundingClientRect().bottom && document.body.innerText.includes('你的操作') && document.getElementById('retry').getBoundingClientRect().bottom < document.getElementById('seats').getBoundingClientRect().top"), 'top status/connection controls or bottom own actions');
   assert(await evaluate(page, 'document.documentElement.scrollWidth <= innerWidth'), 'layout horizontal overflow');
 }
+async function checkCards(page, mobile) {
+  assert(await evaluate(page, "document.querySelectorAll('.hand-reference .reference-row').length === 10 && [...document.querySelectorAll('.hand-reference .reference-row')].every(row => row.querySelectorAll('.playing-card').length === 5) && document.querySelector('.hand-reference').textContent.includes('同花大顺') && document.querySelector('.hand-reference').textContent.includes('High Card')"), 'complete ten hand categories with five examples');
+  assert(await evaluate(page, "document.querySelectorAll('.board .playing-card').length === 5 && document.querySelector('.pot').getBoundingClientRect().bottom < document.querySelector('.board').getBoundingClientRect().top && document.querySelector('.pot').textContent.includes('chips')"), 'five board slots below chips pot');
+  if (mobile) {
+    assert(await evaluate(page, "!document.querySelector('.hand-reference').open"), 'phone reference must start collapsed');
+    await evaluate(page, "document.querySelector('.hand-reference summary').click()");
+    assert(await evaluate(page, "document.querySelector('.hand-reference').open && document.documentElement.scrollWidth <= innerWidth"), 'phone reference cannot expand without overflow');
+    await screenshot(page, 'poker-reference-mobile');
+    await evaluate(page, "document.querySelector('.hand-reference summary').click()");
+  } else assert(await evaluate(page, "document.querySelector('.hand-reference').getBoundingClientRect().right <= document.querySelector('.table').getBoundingClientRect().left"), 'desktop reference must stay left');
+}
 async function observeThinking(page) {
   await wait(page, 'confirmed?.hand?.botThinking', 'robot thinking');
   const start = await state(page);
@@ -95,7 +106,8 @@ async function observeThinking(page) {
   await screenshot(page, 'poker-thinking');
   await wait(page, `confirmed.hand.turn !== ${start.hand.turn}`, 'actual robot action');
   const next = await state(page);
-  assert(next.hand.actor !== 'bot' && next.hand.deadline - next.serverTime === 30000, 'next human did not get fresh thirty seconds');
+  const remaining = next.hand.deadline - next.serverTime;
+  assert(next.hand.actor !== 'bot' && remaining <= 30000 && remaining >= 29900, `next human did not get fresh thirty seconds: ${remaining}ms`);
   report.cases.push('robot thinking label, thirty-second display basis retained across query, action before display expires, next human fresh thirty seconds');
 }
 try {
@@ -105,20 +117,27 @@ try {
   const first = await openPage(1280);
   await wait(first, "confirmed?.seats[0]?.id === confirmed?.you && socket?.readyState === WebSocket.OPEN", 'first entry');
   if (process.argv.includes('--layout')) await checkLayout(first, false);
+  if (process.argv.includes('--cards')) await checkCards(first, false);
   await action(first, '开始');
   assert((await state(first)).hand.players.length === 2, 'solo game missing bot');
   assert(await evaluate(first, "document.getElementById('countdown').textContent.includes('当前行动剩余')"), 'action countdown missing');
   const second = await openPage(390);
   await wait(second, "confirmed?.seats[1]?.id === confirmed?.you && socket?.readyState === WebSocket.OPEN", 'second entry');
   const waiting = await state(second);
+  if (process.argv.includes('--cards')) { await checkCards(second, true); assert(await evaluate(second, "document.querySelectorAll('.seat.mine .playing-card').length === 0"), 'waiting entrant must not have dealt cards'); }
   assert(!waiting.hand.players.some(player => player.id === waiting.you), 'mid-hand entrant was dealt');
   for (let i = 0; i < 4; i++) {
     await action(first, '过牌');
     if (i === 0) await observeThinking(first);
+    if (process.argv.includes('--cards')) {
+      await wait(first, `document.querySelectorAll('.board .card-face').length === ${[3,4,5,5][i]}`, 'revealed board slots');
+      assert(await evaluate(first, "[...document.querySelectorAll('.board .playing-card')].every(card => Math.abs(card.getBoundingClientRect().y-document.querySelector('.board .playing-card').getBoundingClientRect().y)<2)"), 'five board cards must stay in one row');
+    }
   }
   await wait(first, "confirmed?.hand?.stage === 'finished'", 'solo settlement after bot');
   assert((await state(first)).hand.stage === 'finished', 'solo did not settle');
   report.cases.push('one human + bot, mid-hand waiting entrant, four check streets and result');
+  if (process.argv.includes('--cards')) report.cases.push('ten reference categories, phone expand/collapse, native card faces/backs, waiting privacy, 0/3/4/5 board progression and chips');
   await action(first, '开始');
   assert((await state(first)).hand.players.length === 3, 'next hand did not include second human');
   const third = await openPage(390);

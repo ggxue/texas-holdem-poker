@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>在线德州扑克</title>
   <link rel="stylesheet" href="/style.css">
+  <script defer src="/cards.js"></script>
   <script defer src="/app.js"></script>
 </head>
 <body>
@@ -15,6 +16,7 @@
       <div class="connection-actions"><button id="leave" type="button" disabled>退出房间</button><button id="retry" type="button">重新连接</button></div>
     </section>
     <div class="play-layout">
+      <details class="hand-reference" open><summary>牌型参考 <span>强 → 弱</span></summary><div id="reference-list"></div></details>
       <section class="table" aria-label="牌桌">
         <div class="table-label">唯一房间 · 最多五名真人</div>
         <div id="seats" class="seats"></div>

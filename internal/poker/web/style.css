@@ -1,4 +1,4 @@
-﻿:root { color-scheme: dark; font-family: system-ui, sans-serif; background: #101b1a; color: #eef4ef; }
+:root { color-scheme: dark; font-family: system-ui, sans-serif; background: #101b1a; color: #eef4ef; }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 24px 16px; }
 main { max-width: 1248px; margin: auto; }
@@ -44,7 +44,7 @@ button:disabled { opacity: .5; cursor: default; }
 button:focus-visible { outline: 3px solid white; outline-offset: 4px; }
 .connection-actions button { background: #23483a; color: #e0bf80; border: 1px solid #6d7e60; }
 .hint { font-size: 13px; color: #b2beb7; line-height: 1.7; }
-@media (max-width: 760px) {
+@media (max-width: 1100px) {
   body { padding: 16px 12px; }
   .status-bar { flex-direction: column; align-items: stretch; padding: 14px; }
   .table { padding: 4px 0; }
@@ -55,4 +55,41 @@ button:focus-visible { outline: 3px solid white; outline-offset: 4px; }
   .community { padding: 14px 8px; }
   .action-panel { padding: 16px; }
   #actions button { flex: 1 1 auto; }
+}
+.play-layout { display: grid; grid-template-columns: 238px minmax(0, 1fr); gap: 14px; align-items: start; }
+.hand-reference { border: 1px solid #486659; border-radius: 14px; background: #102923; padding: 12px; }
+.hand-reference summary { color: #e0bf80; font-weight: 700; list-style: none; pointer-events: none; }
+.hand-reference summary span { float: right; font-weight: 400; font-size: 12px; color: #b4d8c8; }
+.reference-row { padding: 10px 0; border-top: 1px solid #315144; }
+.reference-row:first-child { margin-top: 12px; }
+.reference-row strong { font-size: 13px; }
+.reference-row small { color: #b4d8c8; font-size: 11px; margin-left: 8px; }
+.reference-cards, .hole-cards, .board { display: flex; gap: 5px; justify-content: center; align-items: center; }
+.reference-cards { justify-content: flex-start; margin-top: 5px; }
+.playing-card { position: relative; display: inline-flex; flex: 0 0 auto; flex-direction: column; justify-content: space-between; align-items: center; width: 42px; height: 58px; border-radius: 5px; border: 1px solid #d8dfd9; background: #f6f5ed; color: #17261e; padding: 3px 5px; line-height: 1; box-shadow: 0 2px 4px #0003; }
+.card-rank { align-self: flex-start; font-size: 16px; font-weight: 700; }
+.card-suit { font-size: 23px; }
+.playing-card.red { color: #aa2935; }
+.card-back { border: 2px solid #d9b878; background: repeating-linear-gradient(45deg, #234d3d 0 3px, #102923 3px 7px); }
+.card-back::after { content: ''; position: absolute; inset: 7px; border: 1px solid #d9b878; border-radius: 3px; }
+.card-empty { background: #ffffff04; border: 1px dashed #8baf99; box-shadow: none; }
+.reference-cards .playing-card { width: 29px; height: 39px; padding: 3px; }
+.reference-cards .card-rank { font-size: 11px; }
+.reference-cards .card-suit { font-size: 17px; }
+.board .playing-card { width: 50px; height: 70px; padding: 5px; }
+.board .card-rank { font-size: 18px; }
+.board .card-suit { font-size: 29px; }
+.chips::before { content: ''; display: inline-block; width: 15px; height: 15px; border-radius: 50%; border: 3px dashed #d9b878; box-shadow: inset 0 0 0 2px #40553d; background: #92703e; margin-right: 6px; vertical-align: baseline; }
+.chips { font-size: 18px; }
+.hole-cards { min-height: 58px; }
+@media (max-width: 1100px) {
+  .play-layout { display: block; }
+  .hand-reference { margin-bottom: 18px; }
+  .hand-reference summary { pointer-events: auto; cursor: pointer; min-height: 24px; }
+  .hand-reference summary::before { content: '＋ '; }
+  .hand-reference[open] summary::before { content: '− '; }
+  .reference-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .reference-row small { display: block; margin: 3px 0 0; }
+  .reference-cards { margin: 0; }
+  .board .playing-card { width: 50px; height: 70px; }
 }

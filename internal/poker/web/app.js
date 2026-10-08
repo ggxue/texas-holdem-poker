@@ -74,7 +74,7 @@ function render(view) {
       hole.className = "hole-cards"; // 空位和待局者不画虚假暗牌。
       const chips = document.createElement("div"); // 余额仅展示确认视图。
       chips.className = "chips"; // 金色区分可用筹码。
-      chips.textContent = `${player.chips} 筹码`; // 牌面票再统一chips与图标。
+      chips.textContent = `${player.chips} chips`; // 统一使用整数chips，图标由样式绘制。
       const investment = document.createElement("div"); // 投入和状态位于余额之后。
       investment.className = "investment"; // 与可用余额分别显示。
       const detail = document.createElement("div"); // 座位状态不和名称混排。
@@ -87,8 +87,8 @@ function render(view) {
         else if (participant.allIn) labels.push("全押"); // 全押标记与余额分开。
         if (view.hand.actor === player.id) labels.push("当前行动"); // 当前行动与本人高亮同时存在。
         if (player.id === "bot" && view.hand.botThinking) labels.push("思考中"); // 保留真实等待提示。
-        hole.textContent = participant.hole?.length ? cardsText(participant.hole) : "暗牌 · 暗牌"; // 不从隐藏DOM恢复他人暗牌。
-        investment.textContent = `本局投入 ${participant.invested}`; // 本局投入由服务端确认。
+        appendCards(hole, participant.hole || [], 2, !participant.hole?.length); // 有参赛资格才画两张公开牌面或无数据牌背。
+        investment.textContent = `本局投入 ${participant.invested} chips`; // 本局投入由服务端确认。
         if (participant.strength) labels.push(`${participant.strength.category}：${cardsText(participant.strength.cards)}`); // 结果票前仍保留公开结果。
         if (view.hand.stage === "finished") labels.push(`获得 ${participant.won} · 结算余额 ${participant.balance}`); // 不自行重新派奖。
       } else { // 没有本局资格不显示已发手牌。
@@ -109,10 +109,11 @@ function render(view) {
   community.className = "community"; // 桌面居中，手机在五名真人之后。
   const pot = document.createElement("div"); // 底池始终在公共牌上方。
   pot.className = "pot"; // 独立显示底池数值。
-  pot.textContent = `底池 ${hand?.pot || 0} 筹码`; // 不使用参考图示例数额。
-  const board = document.createElement("div"); // 牌面票会替换成固定五位卡片。
+  pot.textContent = `底池 ${hand?.pot || 0} chips`; // 不使用参考图示例数额或美元单位。
+  const board = document.createElement("div"); // 固定五位不会随发牌移动。
   board.className = "board"; // 保留公共牌区域。
-  board.textContent = cardsText(hand?.board || []) || "公共牌 · 尚未发牌"; // 仅展示已公开牌。
+  board.setAttribute("aria-label", "公共牌"); // 为五张牌提供区域名称。
+  appendCards(board, hand?.board || [], 5); // 未发牌位仅显示轮廓，阶段沿用0、3、4、5。
   community.append(pot, board); // 维持底池与公共牌层级。
   seats.append(community); // 与六个固定席共用区域关系。
   gameInfo.textContent = hand ? stageNames[hand.stage] : "等待房主开始 · 每人底注 1"; // 状态栏在桌面上方。
