@@ -2,7 +2,7 @@
 
 > 当前覆盖：状态只在单进程内存中；重新入房本人余额设100；原有数据库提交/真实数据库fixture/跨重启持久性条款已撤销，不执行。游戏规则和公开seam沿用修订spec；详见[当前决定](../memory-reset-decision.md)。
 
-Status: ready-for-agent
+Status: in-progress
 Type: implementation
 Spec: [在线德州扑克首版规格](../spec.md)
 Blocked by: [04](04-bet-allin-single-pot.md)
@@ -28,9 +28,13 @@ Primary acceptance cases: AC24
 
 ## Validation
 
-Implementation baseline: 待实施开始、任何代码编辑前记录 SHA。
+Implementation baseline: b38dad8489260368d9dba2072781d2bb2348fa4d。
 
-尚未实施，本次发布不构成游戏验收通过。
+实现及自动化通过，实际浏览器/最终检查待12，不提前标done。
+- RED：TestAC24在0真人或机器人开局返回insufficient_chips，退出1。
+- GREEN：scripts/test-go.ps1 -Package ./internal/poker -Run TestAC24退出0；0/37/180扣底注后99/36/179，机器人归零同样补100，1不补且底注全押，稳定请求重试不重复补给。
+- Standards与Spec均0项实质问题；审查git diff --cached b38dad8 --。
+- gofmt通过；全套格式/vet/测试/构建与浏览器证据在12汇总，race缺C编译器仍待处理。
 按[项目验证约定](../../../docs/agents/harness.md)记录命令、退出码、目标 RED/GREEN、
 可复现浏览器/内存行为证据和限制；格式、vet、测试、构建及适用并发检查缺工具或失败不得静默跳过。
 完成前以实施 baseline 和本规格分别审查 Standards/Spec，记录结果；仅验收满足才标 done。

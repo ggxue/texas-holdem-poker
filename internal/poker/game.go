@@ -128,10 +128,10 @@ func (a *App) gameCommand(id string, cmd command) string {
 		}
 		h.Players = append(h.Players, participant{ID: "bot", Seat: 2}) // 每局固定一个机器人。
 		for i := range h.Players {                                     // 每名参赛者只收一次底注并发两张牌。
-			p := &h.Players[i]       // 取得当前参赛者。
-			if s.balance(p.ID) < 1 { // 检查是否能支付底注。
-				return "insufficient_chips" // 余额不足时拒绝开局。
-			} // 本票不处理归零补给。
+			p := &h.Players[i]        // 取得当前参赛者。
+			if s.balance(p.ID) == 0 { // 只有本次参赛者余额归零才免费补给。
+				s.setBalance(p.ID, 100) // 下一局底注前补到100，不给正余额增加筹码。
+			}
 		}
 		for i := range h.Players { // 所有检查成功后统一扣款发牌。
 			p := &h.Players[i]                                        // 取得参赛者。
