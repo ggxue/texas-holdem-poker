@@ -2,6 +2,7 @@ services:
   - type: web
     name: texas-poker
     runtime: go
+    branch: master
     plan: free
     numInstances: 1
     buildCommand: go version && go build -tags netgo -ldflags '-s -w' -o app .

@@ -1,27 +1,53 @@
-# 免费部署准备
+# 免费部署
 
-当前仅完成本地实现和部署配置，尚未实际上线。
-项目没有 Git remote，也没有可用 Render 访问权限；需要仓库 URL 和免费账号入口。
-官方限制及来源见[当前研究](../.scratch/online-poker/free-web-research.md)，
-验收状态见[证据](../.scratch/online-poker/acceptance-evidence.md)。
+源码仓库为 [ggxue/texas-holdem-poker](https://github.com/ggxue/texas-holdem-poker)，发布分支为master。
+B2界面和中文播报已完成本地验收；当前还没有已验证的公网游戏地址。实际状态及证据见[发布票05](../.scratch/poker-screen-audio/issues/05-release.md)。
 
-使用根目录 render.yaml 创建 Render Blueprint：Go web、明确 plan: free、
-一个实例、/healthz、手动部署。没有数据库、磁盘或付费资源。
-构建输出 go version；平台 SDK 必须满足 go.mod，不符合时停止部署并记录。
-服务读取 PORT，平台提供免费域名和 HTTPS，页面自动使用 WSS。
+## 推荐入口
 
-上线步骤：将当前提交放入可访问仓库，免费 Render 账号连接仓库并创建 Blueprint；
-在创建前确认控制台明确免费且不要求支付方式。账号要求绑卡则停止，
-不得用付费套餐替代。核对一个实例、免费域名、地域和构建版本，
-上线后用两个浏览器及手机执行票12的 HTTP/WSS、结算、重连和冷启动验收，
-记录实际 URL、地域、额度和唤醒耗时。当前没有这些云证据。
+打开[部署到Render](https://render.com/deploy?repo=https%3A%2F%2Fgithub.com%2Fggxue%2Ftexas-holdem-poker)。
+登录后由根目录render.yaml创建Blueprint，检查资源列表只有一个 `texas-poker` Free Web Service，再开始部署。
+若仓库为私有，仅授权Render访问这个仓库。需要支付方式或付费计划时停止，不创建数据库或付费资源。
+官方提供这种[部署入口](https://render.com/docs/deploy-to-render)，项目已关闭自动部署。
 
-研究中的免费限制：无入站流量15分钟休眠，唤醒约1分钟；每工作区每月750小时、
-5GB出站和500构建分钟，0.1 CPU/512MB。以实际控制台和官方当时条款为准。
-不额外保活。磁盘临时，房间和筹码只在内存；休眠导致进程结束、
-重启或重部署均清空房间，新身份首次100。同进程重新入房也设100。
-页面会显示连接/唤醒提示，但没有跨重启找回旧余额功能。
+## 手动创建Web Service
 
-自动部署关闭，维护时先确认没有进行中的牌局。平台滚动替换可能让旧新进程
-短暂并存，两者不是共享房间，不承诺无停机或迁移。本地重启实验验证的是
-应用行为，不能替代平台休眠、HTTPS/WSS和实际免费配置验收。
+在控制台选择 New → Web Service，连接上述仓库；如果此前在Postgres页面，返回Web Service。
+按下表设置，先核对Free再创建。
+
+| 字段 | 值 |
+| --- | --- |
+| Name | texas-poker |
+| Language / Runtime | Go |
+| Branch | master |
+| Root Directory | 留空（仓库根目录） |
+| Build Command | `go version && go build -tags netgo -ldflags '-s -w' -o app .` |
+| Start Command | `./app` |
+| Instance Type | Free；单实例 |
+| Health Check Path | `/healthz` |
+| Auto-Deploy | Off / 手动 |
+| Environment | `CGO_ENABLED=0`、`GOTOOLCHAIN=local` |
+
+应用自动读取Render的PORT并提供网页及WebSocket。原生Go自动跟随最新stable，不能固定Go版本；
+检查构建日志输出的版本满足go.mod，并确认编译成功。参见[官方Go部署](https://render.com/docs/deploy-go-gin)与[语言支持](https://render.com/docs/language-support)。
+
+## 部署后的验收
+
+服务状态为Live后，复制实际 `https://…onrender.com` 地址。核对 `/healthz` 返回ok；
+使用两个独立浏览器身份完成开局、动作、结算及下一局，确认实时连接为WSS和手牌隐私。
+在页面点击启用声音，试听声线并验证轮到本人、十秒提醒、静音和恢复。
+同进程重连须设100且保留原期限；实际重部署后须清空房间、新入房100。
+记录服务URL、地域、提交SHA、Go版本、实际免费额度、结果及失败，不能用本地证据代替云验收。
+
+## 免费运行限制
+
+2026-10-10复核：[Render Free](https://render.com/docs/free)仍规定15分钟无入站流量后休眠，
+下次请求或新WebSocket连接唤醒约一分钟；每工作区每月750免费实例小时。
+无支付方式时，出站额度耗尽会暂停服务，构建额度耗尽会停止新构建。
+具体带宽与构建分钟看该账号Billing页面，本轮没有验证账号额度。
+
+Free仅单实例且平台可能重启服务。项目无数据库、无额外保活；休眠导致进程结束、重启或重部署
+均清空房间、牌局和筹码，不能找回旧余额。页面有连接/唤醒提示。
+实际公网WS使用WSS，部署和维护可能断开连接，详见[官方WebSocket说明](https://render.com/docs/websocket)。
+维护部署先确认没有进行中的牌局；自动部署已关闭。旧新进程在替换时可能短暂并存，
+两者不是共享房间，不承诺无停机或迁移。
