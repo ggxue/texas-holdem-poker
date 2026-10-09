@@ -8,6 +8,7 @@ const countdown = document.getElementById("countdown");
 const leaveButton = document.getElementById("leave"); // 顶部退出入口保持服务端占座权限。
 const results = document.getElementById("results"); // 结算在独立区域呈现，保留服务器快照。
 const commandStatus = document.getElementById("command-status"); // 提交确认与连接状态分开，避免覆盖故障信息。
+const actionHint = document.getElementById("action-hint"); // 简短说明放在按钮旁，不附加括号状态。
 let clockOffset = 0;
 let lastServerTime = 0;
 let sending = false;
@@ -96,8 +97,16 @@ function render(view, live = false) {
   actions.replaceChildren();
   if (view.host === view.you && (!hand || hand.stage === "finished") && !view.seats.some(player => player?.disconnectedUntil || player?.connectingUntil)) addAction("start", "开始新一局");
   for (const action of hand?.legal || []) {
-    const labels = {check: "过牌", fold: "弃牌", bet: `下注 ${hand.betAmount}${hand.betAmount < 10 ? "（不足全押）" : ""}`, call: `跟注 ${hand.callAmount}${hand.callAmount < hand.target ? "（不足全押）" : ""}`};
+    const labels = {check: "过牌", fold: "弃牌", bet: `下注 ${hand.betAmount}`, call: `跟注 ${hand.callAmount}`, allin: `全押 ${hand.allInAmount}`};
     addAction(action, labels[action] || action);
+  }
+  actionHint.hidden = sending || connecting || takenOver || !hand?.legal?.length;
+  actionHint.textContent = "";
+  if (!actionHint.hidden) {
+    const remaining = BigInt(hand.allInAmount), required = BigInt(hand.callRequired);
+    actionHint.textContent = required > 0n
+      ? remaining <= required ? `需跟 ${hand.callRequired} · 本次跟注 ${hand.callAmount} 后全押` : `需跟 ${hand.callRequired} · 跟注后剩 ${remaining - BigInt(hand.callAmount)}`
+      : "过牌继续参与 · 弃牌放弃本局 · 全押投入全部余款";
   }
   leaveButton.disabled = sending || !view.seats.some(player => player?.id === view.you); // 顶部退出入口跟随占座与提交状态。
   if (!actions.children.length) { // 没有合法动作也说明等待原因。
@@ -257,6 +266,9 @@ function addAction(action, label) {
   button.textContent = label;
   button.disabled = sending || connecting;
   if (["bet", "call", "start"].includes(action)) button.className = "primary";
+  if (action === "allin") button.className = "allin";
+  const hints = {check: "无需补筹码，继续参与", fold: "放弃本局获奖资格，已投入不退", call: "按可用筹码补本轮欠额", allin: "投入全部剩余筹码"};
+  button.title = hints[action] || "";
   button.addEventListener("click", () => sendAction(action));
   actions.append(button);
 }

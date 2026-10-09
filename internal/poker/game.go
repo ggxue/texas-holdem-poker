@@ -39,20 +39,22 @@ type hand struct {
 	deadlineTurn    int64
 }
 type handView struct {
-	ID          int64         `json:"id"`
-	Turn        int64         `json:"turn"`
-	Stage       string        `json:"stage"`
-	Pot         int64         `json:"pot"`
-	Board       []Card        `json:"board"`
-	Players     []participant `json:"players"`
-	Actor       string        `json:"actor"`
-	Target      int64         `json:"target"`
-	Legal       []string      `json:"legal"`
-	CallAmount  int64         `json:"callAmount"`
-	BetAmount   int64         `json:"betAmount"`
-	Deadline    int64         `json:"deadline"`
-	StartSeat   int           `json:"actionStartSeat"`
-	BotThinking bool          `json:"botThinking"`
+	ID           int64         `json:"id"`
+	Turn         int64         `json:"turn"`
+	Stage        string        `json:"stage"`
+	Pot          int64         `json:"pot"`
+	Board        []Card        `json:"board"`
+	Players      []participant `json:"players"`
+	Actor        string        `json:"actor"`
+	Target       int64         `json:"target"`
+	Legal        []string      `json:"legal"`
+	CallAmount   string        `json:"callAmount"`
+	CallRequired string        `json:"callRequired"`
+	AllInAmount  string        `json:"allInAmount"`
+	BetAmount    int64         `json:"betAmount"`
+	Deadline     int64         `json:"deadline"`
+	StartSeat    int           `json:"actionStartSeat"`
+	BotThinking  bool          `json:"botThinking"`
 }
 
 func randomBotThinkSeconds() (int, error) {
@@ -72,7 +74,7 @@ func randomActionStart(seats []int) (int, error) {
 }
 
 func validAction(action string) bool {
-	return action == "join" || action == "start" || action == "check" || action == "bet" || action == "call" || action == "fold" || action == "leave" // 限定本票公开命令范围。
+	return action == "join" || action == "start" || action == "check" || action == "bet" || action == "call" || action == "fold" || action == "allin" || action == "leave" // 全押金额仅由服务端余额决定。
 }
 
 func shuffledDeck() ([]Card, error) {
@@ -94,9 +96,9 @@ func shuffledDeck() ([]Card, error) {
 }
 
 func (h *hand) visibleTo(id string) *handView {
-	v := &handView{ID: h.ID, Turn: h.Turn, Stage: h.Stage, Pot: h.Pot, Board: append([]Card{}, h.Board...), Target: h.Target, Players: make([]participant, len(h.Players))} // 构造独立的公开快照。
-	v.StartSeat = h.Players[h.Start].Seat                                                                                                                                   // 全局保留同一公开行动起点，包含已全押或离房者。
-	if !h.Deadline.IsZero() {                                                                                                                                               // 有有效行动机会时才公开期限。
+	v := &handView{ID: h.ID, Turn: h.Turn, Stage: h.Stage, Pot: h.Pot, Board: append([]Card{}, h.Board...), Target: h.Target, Players: make([]participant, len(h.Players)), CallAmount: "0", CallRequired: "0", AllInAmount: "0"} // 构造独立快照，非行动者没有扣款提示。
+	v.StartSeat = h.Players[h.Start].Seat                                                                                                                                                                                         // 全局保留同一公开行动起点，包含已全押或离房者。
+	if !h.Deadline.IsZero() {                                                                                                                                                                                                     // 有有效行动机会时才公开期限。
 		v.Deadline = h.Deadline.UnixMilli() // 使用绝对毫秒时间，重连不会重新计时。
 		if !h.ThinkingStarted.IsZero() {    // 机器人实际期限与页面三十秒显示分别保存。
 			v.BotThinking = true                                             // 显示思考状态，不暴露未来实际动作时刻。
@@ -117,9 +119,6 @@ func (h *hand) visibleTo(id string) *handView {
 	}
 	if h.Stage != "finished" && h.Actor >= 0 { // 只有未结束的牌局存在行动者。
 		v.Actor = h.Players[h.Actor].ID // 公布当前行动身份。
-		if v.Actor == id {              // 仅当前行动者收到合法按钮。
-			v.Legal = h.legal() // 返回服务器计算的合法动作。
-		} // 只向本人返回当前合法的四动作子集。
 	}
 	return v // 不发送剩余牌序。
 }
@@ -389,17 +388,17 @@ func (s *room) settle(showdown bool) string {
 	return ""             // 结果保留到下一次开局。
 }
 
-func (h *hand) legal() []string {
+func (h *hand) legal(balance int64) []string {
 	p := h.Players[h.Actor]  // 读取当前玩家的轮内投入。
 	if p.Folded || p.AllIn { // 已弃牌或全押者不能行动。
 		return nil // 不返回任何合法按钮。
 	} // 已弃牌或全押不能行动。
-	if p.Street < h.Target { // 判断当前玩家是否欠注。
-		return []string{"call", "fold"} // 欠注时只允许跟注或弃牌。
-	} // 欠注时只能跟注或弃牌。
 	actions := []string{"check", "fold"} // 不欠注时允许过牌或弃牌。
-	capable := 0                         // 统计仍能下注的人数。
-	for _, other := range h.Players {    // 统计仍能下注的对手。
+	if p.Street < h.Target {             // 欠注时不能用过牌跳过付款。
+		actions = []string{"call", "fold"} // 跟注金额由实际余额限制。
+	} // 全押是否可用另按仍能回应的对手判断。
+	capable := 0                      // 统计仍能下注的人数。
+	for _, other := range h.Players { // 统计仍能下注的对手。
 		if !other.Folded && !other.AllIn { // 跳过弃牌和全押的参赛者。
 			capable++ // 增加能下注的人数。
 		}
@@ -407,12 +406,15 @@ func (h *hand) legal() []string {
 	if h.Target == 0 && capable >= 2 { // 本轮尚无下注且至少两人有行动能力。
 		actions = append(actions, "bet") // 增加一次固定下注的合法按钮。
 	} // 每轮仅一次下注，禁止独自追加。
+	if balance > 0 && (capable >= 2 || (p.Street < h.Target && balance <= h.Target-p.Street)) { // 唯一欠注者仅能用不超过欠额的余款全押。
+		actions = append(actions, "allin") // 不增加任意金额或普通加注命令。
+	} // 已全押者不会重新获得动作。
 	return actions // 服务器统一决定合法按钮。
 }
 func (s *room) act(action, reason string) string {
-	h := s.Hand                         // 动作只作用于当前牌局。
-	valid := false                      // 默认动作无效。
-	for _, allowed := range h.legal() { // 遍历服务器计算的合法动作。
+	h := s.Hand                                                         // 动作只作用于当前牌局。
+	valid := false                                                      // 默认动作无效。
+	for _, allowed := range h.legal(s.balance(h.Players[h.Actor].ID)) { // 与公开按钮共用服务端合法性判断。
 		if allowed == action { // 请求动作必须在合法列表内。
 			valid = true // 确认该动作合法。
 		}
@@ -428,6 +430,9 @@ func (s *room) act(action, reason string) string {
 	if action == "call" { // 跟注只补本轮欠款。
 		amount = h.Target - p.Street // 计算当前欠注，不抵底注。
 	} // 跟注只补本轮差额，底注不抵扣。
+	if action == "allin" { // 主动全押不接受客户端金额。
+		amount = s.balance(p.ID) // 本次投入全部剩余筹码。
+	} // 之前本轮投入仍另外累计到目标。
 	if amount > s.balance(p.ID) { // 余额不足时不能透支。
 		amount = s.balance(p.ID) // 将实际扣款限制为本人全部余额。
 	} // 不足时扣实际余额全押。
@@ -437,9 +442,9 @@ func (s *room) act(action, reason string) string {
 	if action == "fold" { // 弃牌会失去本局领奖资格。
 		p.Folded = true // 标记玩家已经弃牌。
 	} // 弃牌立即失去领奖资格。
-	if action == "bet" { // 新下注要求此前过牌者重新回应。
-		h.Target = amount          // 短额下注的实际金额成为目标。
-		for i := range h.Players { // 按固定名单更新本轮应答状态。
+	if p.Street+amount > h.Target { // 更高的本轮累计投入要求此前玩家重新回应。
+		h.Target = p.Street + amount // 全押提高目标；短额跟注/全押不降低目标。
+		for i := range h.Players {   // 按固定名单更新本轮应答状态。
 			h.Players[i].acted = false // 让玩家回应新下注。
 		} // 其余未弃牌且非全押玩家重新应答。
 	}

@@ -1,6 +1,7 @@
 /* Shared harness for real HTTP/WS pages in isolated CDP browser contexts. */
 export async function createBrowserClient(base, {casino=false, newDocumentScript=""}={}) {
-  const info = await (await fetch('http://127.0.0.1:9228/json/version')).json();
+  const debuggerURL = process.env.POKER_CDP_URL || 'http://127.0.0.1:9228';
+  const info = await (await fetch(`${debuggerURL}/json/version`)).json();
   const socket = new WebSocket(info.webSocketDebuggerUrl);
   await new Promise((resolve, reject) => { socket.addEventListener('open', resolve, {once:true}); socket.addEventListener('error', reject, {once:true}); });
   let sequence = 0;

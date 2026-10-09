@@ -14,4 +14,5 @@
 .seat{line-height:1.2;gap:2px}.seat.mine{gap:0}.hole-cards{margin:1px 0}
 @media(max-width:700px){.seat,.seat.mine{gap:6px}}
 #voice-status{min-width:0;max-width:50%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#action-hint{font-size:14px;color:var(--muted);line-height:1.2;min-width:0}button.allin{color:#fff0ce;border-color:#f1d099;background:repeating-linear-gradient(0deg,#ffffff0b 0 1px,transparent 1px 3px),linear-gradient(145deg,#a63b4e,#642536);box-shadow:inset 0 1px #e89983,0 3px 5px #0006;font-weight:700}button.allin:hover{background:linear-gradient(#b6445b,#7a2940);border-color:#ffe7b6}
 @media(max-width:700px){#voice-status{max-width:100%;white-space:normal}}

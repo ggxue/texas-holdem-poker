@@ -225,9 +225,9 @@ function eventPhrases(e) {
   if (e.kind === "action") {
     const keys = [seat];
     if (e.reason === "timeout") keys.push("timeout");
-    keys.push(e.action);
-    if (e.action === "bet" || e.action === "call") keys.push(...chipNumberPhrases(e.amount), "chips");
-    if (e.allIn) keys.push("allin");
+    keys.push(e.action === "allin" ? "allin-action" : e.action);
+    if (["bet", "call", "allin"].includes(e.action)) keys.push(...chipNumberPhrases(e.amount), "chips");
+    if (e.allIn && e.action !== "allin") keys.push("allin");
     return keys;
   }
   if (e.kind === "winner") return [seat, "winner", ...chipNumberPhrases(e.amount), "chips"];

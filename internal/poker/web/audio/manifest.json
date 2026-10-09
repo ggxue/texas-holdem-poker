@@ -9,6 +9,7 @@
                     "call":  "跟注",
                     "fold":  "弃牌。",
                     "allin":  "全押。",
+                    "allin-action":  "全押",
                     "timeout":  "超时，自动",
                     "chips":  "筹码。",
                     "winner":  "获得",

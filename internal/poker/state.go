@@ -1,6 +1,9 @@
 package poker
 
-import "time"
+import (
+	"strconv"
+	"time"
+)
 
 const humanSeatCount = 5
 
@@ -50,9 +53,12 @@ func (s room) visibleTo(id string) view {
 	if s.Hand != nil {
 		v.Hand = s.Hand.visibleTo(id)
 		if v.Hand.Actor == id { // 只有当前行动者需要实际扣款提示。
-			p := s.Hand.Players[s.Hand.Actor]                              // 读取本人本轮投入。
-			v.Hand.CallAmount = min(s.Hand.Target-p.Street, s.balance(id)) // 跟注不足时只扣剩余余额。
-			v.Hand.BetAmount = min(int64(10), s.balance(id))               // 固定十枚下注不足时显示全押金额。
+			p := s.Hand.Players[s.Hand.Actor]                                                     // 读取本人本轮投入。
+			v.Hand.Legal = s.Hand.legal(s.balance(id))                                            // 只有本人当前机会收到合法按钮。
+			v.Hand.CallRequired = strconv.FormatInt(s.Hand.Target-p.Street, 10)                   // 欠额与实际扣款分开，不由JS推算。
+			v.Hand.CallAmount = strconv.FormatInt(min(s.Hand.Target-p.Street, s.balance(id)), 10) // 大额跟注也精确显示。
+			v.Hand.AllInAmount = strconv.FormatInt(s.balance(id), 10)                             // 全押实际金额采用精确十进制文字。
+			v.Hand.BetAmount = min(int64(10), s.balance(id))                                      // 固定十枚下注不足时显示全押金额。
 		}
 	}
 	for i, occupant := range s.Seats {
