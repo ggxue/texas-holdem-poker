@@ -87,6 +87,23 @@ func TestAAC04ContinuousRaisesRetainEarlierAllIns(t *testing.T) {
 	}
 }
 
+func TestRaiseReopensEarlierCallerWithoutChargingOriginalCallAgain(t *testing.T) {
+	prefix := []Card{{14, 3}, {14, 2}, {13, 3}, {13, 2}, {12, 3}, {12, 2}, {10, 3}, {10, 2}, {2, 0}, {4, 1}, {7, 2}, {9, 0}, {11, 1}}
+	_, s, c := multiAllInRoom(t, prefix, []int64{50, 51, 81, 101})
+	do(t, c[0], s.URL, "ten", "bet")
+	do(t, c[1], s.URL, "first-call", "call")
+	do(t, c[2], s.URL, "eighty", "allin")
+	do(t, c[0], s.URL, "short-response", "call")
+	before := gameState(t, c[1], s.URL)
+	if before.Hand.Actor != before.You || before.Hand.CallRequired != "70" || before.Hand.CallAmount != "40" || before.Hand.Players[1].Street != 10 || before.Hand.Players[1].Invested != 11 {
+		t.Fatalf("earlier caller must respond to higher target using only remaining difference: %+v", before.Hand)
+	}
+	end := do(t, c[1], s.URL, "second-call", "call")
+	if end.Hand.Stage != "finished" || end.Hand.Target != 80 || end.Hand.Players[1].Invested != 51 || end.Hand.Players[0].Won != 263 || end.Bot.Chips != 20 {
+		t.Fatalf("49+50+80+80 plus four antes must settle once as 263: %+v", end.Hand)
+	}
+}
+
 func TestAAC05And06ShortAndLargeResponses(t *testing.T) {
 	for _, third := range []int64{30, 300} {
 		for _, action := range []string{"call", "allin", "fold"} {

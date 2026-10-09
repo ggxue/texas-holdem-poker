@@ -1,6 +1,6 @@
 # 02：主动全押真实操作与播报
 
-Status: resolved
+Status: done
 Type: implementation
 Blocked by: None
 Spec: [规格](../spec.md)
@@ -35,3 +35,4 @@ Implementation baseline: `0d71575da9400ff48688d7152198d321da36019d`
 - 原CDP9228被已有进程占用，保留该进程；浏览器工具增加可选`POKER_CDP_URL`，使用专用9237和隔离profile验收。
 - 本地通过不代表公网完整验收；旧发布票保持原状态。
 - 双轴审查固定`git diff 0d71575da9400ff48688d7152198d321da36019d...15b683f`，实际包含本票工作。Standards：零发现；Spec：零发现。审查包含整数、事务、目标/应答/期限状态转换及并发重试；原型不代替正式验证。
+- 后续Standards追加审查发现实现票应标done而非决策票resolved，已按tracker规则纠正。新增早先跟注者被更高全押目标重开应答的公开回归，验证差额70、实际40和池263；旧UAC09合法列表增加已批准的allin，原过牌应答/行动起点断言保留。

@@ -1,6 +1,6 @@
 # 03：黑桃浏览器图标
 
-Status: in-progress
+Status: done
 Type: implementation
 Blocked by: None
 Spec: [规格](../spec.md)
@@ -12,9 +12,9 @@ Implementation baseline: `15b683f`
 
 ## Acceptance criteria
 
-- [ ] AAC18：页面声明和真实资源匹配；GET/HEAD、SVG类型及静态路径/方法限制有效。
-- [ ] 真实浏览器及16/32px视觉检查清晰；无需外部图片服务。
-- [ ] 保留既有牌桌与业务行为；记录验证和双轴审查。
+- [x] AAC18：页面声明和真实资源匹配；GET/HEAD、SVG类型及静态路径/方法限制有效。
+- [x] 真实浏览器及16/32px视觉检查清晰；无需外部图片服务。
+- [x] 保留既有牌桌与业务行为；记录验证和双轴审查。
 
 ## Public test boundaries
 
@@ -28,3 +28,4 @@ Implementation baseline: `15b683f`
 - 真实Chrome页面声明及图像加载成功；16px/32px渲染截图`artifacts/favicon-16-32.png`已人工查看，棕圆章、浅金黑桃及轮廓清晰。
 - 复核用户原始截图后纠正规格草稿的“深色黑桃”描述：截图实际为浅金色黑桃，与现有页面圆章颜色一致；未改牌桌品牌或业务行为。
 - 双轴审查与最终真实全押浏览器`--icon`整合核验在票04记录；公网尚未验收。
+- 追加独立Standards/Spec审查覆盖`0d71575...253caec`。favicon两轴零发现；Standards发现票02状态名称错误（已改done），不涉及图标或玩法代码。

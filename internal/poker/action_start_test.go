@@ -128,7 +128,7 @@ func TestUAC09EarlierCheckRespondsToBetInSelectedCycle(t *testing.T) {
 		do(t, clients[seat], s.URL, "call", "call")
 	}
 	v := gameState(t, clients[3], s.URL)
-	if v.Hand.Actor != v.You || !slices.Equal(v.Hand.Legal, []string{"call", "fold"}) {
+	if v.Hand.Actor != v.You || !slices.Equal(v.Hand.Legal, []string{"call", "fold", "allin"}) {
 		t.Fatalf("earlier checker was skipped: %+v", v.Hand)
 	}
 	after := do(t, clients[3], s.URL, "call", "call")

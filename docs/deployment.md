@@ -1,7 +1,19 @@
 # 免费部署
 
 源码仓库为 [ggxue/texas-holdem-poker](https://github.com/ggxue/texas-holdem-poker)，发布分支为master。
-B2界面和中文播报已完成本地验收，源码已上传并核对远端master；当前还没有已验证的公网游戏地址。实际状态及证据见[发布票05](../.scratch/poker-screen-audio/issues/05-release.md)。
+B2界面和中文播报已完成本地验收；用户已在既有Render服务试玩，当前还没有提供可独立核验的公网游戏地址。旧公网完整验收状态仍以[发布票05](../.scratch/poker-screen-audio/issues/05-release.md)和真实云票12为准，不将试玩反馈当完整验收。主动全押与黑桃图标的本地证据见[本轮验收](../.scratch/poker-confidence-action/acceptance-evidence.md)。
+
+## 更新已有Render服务（本轮交接）
+
+本轮已在本地master提交主动全押、精确动作金额、中文全押播报和截图风格黑桃favicon。无需新建服务或修改现有构建/启动设置。
+
+1. 在`D:\texas-poker`打开PowerShell，执行`git push origin master`，确保包含本轮最终提交。
+2. 打开Render现有游戏Web Service，核对连接上述仓库和`master`分支。
+3. 在服务的Deploys页面点`Manual Deploy → Deploy latest commit`。项目配置自动部署为Off；实际控制台设置以账号为准。此选项构建所连分支的最新提交，见[Render官方部署说明](https://render.com/docs/deploys#manual-deploys)（2026-10-10核验）。
+4. 等待新部署成为Live，核对Deploys里提交SHA和`git rev-parse HEAD`相同。打开自己实际游戏链接并`Ctrl+F5`，检查标签黑桃和本人行动时的全押金额。
+5. 用两个独立身份试一局：首注全押、对方跟注/弃牌、自动补牌、单池结算和下一局；启用声音听“玩家N全押X筹码”。检查`/healthz`及WSS连接。完整公网验收仍按下文逐项记录。
+
+部署会替换进程，房间、未结束牌局和内存筹码清空。等本局结束且没有人在玩时再更新，之后新入房为100。本轮没有推送或操作Render，也没有推测游戏URL。
 
 ## 推荐入口
 
