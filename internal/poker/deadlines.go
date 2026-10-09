@@ -35,6 +35,7 @@ func (a *App) ensureDeadline() string {
 			}
 			h.ThinkingStarted = a.clock.Now()                                        // 保存刷新和重连共用的三十秒起算点。
 			h.Deadline = h.ThinkingStarted.Add(time.Duration(seconds) * time.Second) // 实际动作只等抽中的整数秒。
+			a.state.announce(announcement{Kind: "thinking", Seat: humanSeatCount})   // 每个新机器人机会只确认一次思考。
 		}
 		h.deadlineTurn = h.Turn // 将期限绑定当前行动标识。
 	}
@@ -127,8 +128,12 @@ func (a *App) tickLocked() {
 					action = "call" // 金额由统一规则按实际余额限制。
 				}
 			}
-			rejection = a.state.act(action) // 用同一合法动作规则处理超时。
-			if rejection == "" {            // 动作成功后才推进。
+			reason := "timeout"                 // 玩家到期动作必须说明超时。
+			if h.Players[h.Actor].ID == "bot" { // 机器人由思考期限驱动，不冒充玩家超时。
+				reason = "robot" // 仍执行同一扣款规则。
+			}
+			rejection = a.state.act(action, reason) // 用同一合法动作规则处理超时。
+			if rejection == "" {                    // 动作成功后才推进。
 				rejection = a.state.advance() // 机器人和下一阶段立即执行。
 			}
 		}
@@ -140,8 +145,9 @@ func (a *App) tickLocked() {
 			a.fault = rejection // 明确报告故障并停止继续自动调度。
 			break               // 避免对已过期失败事件不断重试。
 		}
-		a.state.Version++ // 自动状态变更也有权威版本。
-		changed = true    // 本批需要通知客户端。
+		a.state.Version++       // 自动状态变更也有权威版本。
+		a.commitAnnouncements() // 本次自动事务共同成功才发布动作事实。
+		changed = true          // 本批需要通知客户端。
 	}
 	if changed || a.fault != "" { // 只发送已共同更新的状态或明确故障。
 		a.broadcast(a.state) // 每名收件人仍按身份裁剪。
@@ -171,7 +177,13 @@ func (a *App) disconnectLocked(id, pageID string, generation int64) {
 		return                        // 不允许版本回绕。
 	}
 	a.state.Disconnected[id] = a.clock.Now().Add(30 * time.Second) // 已观察断线创建独立30秒宽限。
-	a.state.Version++                                              // 断线标记也是确认的权威状态。
-	a.broadcast(a.state)                                           // 公开断线状态，不改变手牌权限。
-	a.scheduleLocked()                                             // 同时考虑原行动期限与新宽限。
+	for seat, occupant := range a.state.Seats {                    // 掉线事件只含当前席位。
+		if occupant == id { // 旧页关闭已在前面排除。
+			a.state.announce(announcement{Kind: "disconnect", Seat: seat}) // 不修改行动期限。
+		}
+	}
+	a.state.Version++       // 断线标记也是确认的权威状态。
+	a.commitAnnouncements() // 掉线标记和事件共同确认。
+	a.broadcast(a.state)    // 公开断线状态，不改变手牌权限。
+	a.scheduleLocked()      // 同时考虑原行动期限与新宽限。
 }

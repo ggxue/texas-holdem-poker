@@ -9,14 +9,15 @@ import (
 )
 
 type gameView struct {
-	Version int64         `json:"version"`
-	You     string        `json:"you"`
-	Host    string        `json:"host"`
-	Error   string        `json:"error"`
-	Control int64         `json:"control"`
-	Seats   []*playerView `json:"seats"`
-	Bot     playerView    `json:"bot"`
-	Hand    *struct {
+	Version       int64         `json:"version"`
+	You           string        `json:"you"`
+	Host          string        `json:"host"`
+	Error         string        `json:"error"`
+	Control       int64         `json:"control"`
+	Announcements []heardEvent  `json:"announcements"`
+	Seats         []*playerView `json:"seats"`
+	Bot           playerView    `json:"bot"`
+	Hand          *struct {
 		ID          int64    `json:"id"`
 		Turn        int64    `json:"turn"`
 		Actor       string   `json:"actor"`

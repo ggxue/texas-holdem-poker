@@ -20,6 +20,9 @@ let socket = null;
 let reconnectTimer = null;
 let connecting = false;
 let retryDelay = 1000;
+const voice = createPokerVoice({current:()=>confirmed, now:()=>Date.now()+clockOffset,
+  ready:()=>socket?.readyState===WebSocket.OPEN && !connecting && !takenOver && !leftRoom,
+  refresh:()=>state()}); // 声音读取确认快照，不能修改计时或余额。
 const messages = {
   room_full: "房间已满，请稍后再试。",
   unavailable: "服务暂不可用，请稍后重新连接。",
@@ -39,10 +42,13 @@ const messages = {
   connection_grace: "有玩家断线，等待重连或宽限到期后再开局。",
   chips_overflow: "筹码数值超出可表示范围，此操作没有生效。",
 };
-function render(view) {
+function render(view, live = false) {
   commandStatus.hidden = !sending || takenOver; // 只有未被接管的待响应命令显示提交提示。
   commandStatus.textContent = sending ? "操作结果待确认…" : ""; // 按钮禁用时仍有明确确认状态。
   if (view.error === "taken_over") {
+    if (takenOver) return; // HTTP与WS重复接管故障不得截断第一次本人播报。
+    voice.reset();
+    voice.fault("taken_over");
     takenOver = true;
     clearTimeout(reconnectTimer);
     if (socket) { socket.onclose = null; socket.close(); socket = null; }
@@ -54,7 +60,7 @@ function render(view) {
     return;
   }
   if (takenOver) return;
-  if (view.error) { statusLine.textContent = messages[view.error] || "暂时无法完成操作。"; return; }
+  if (view.error) { statusLine.textContent = messages[view.error] || "暂时无法完成操作。"; voice.fault(view.error); return; }
   if (confirmed && view.you === confirmed.you && view.version < confirmed.version) return;
   confirmed = view;
   if (view.serverTime > lastServerTime) { lastServerTime = view.serverTime; clockOffset = view.serverTime - Date.now(); }
@@ -102,6 +108,7 @@ function render(view) {
   }
   updateCountdown();
   renderResults(view); // 只在确认结算后展示结果，新局替换旧结果。
+  voice.receive(view, live); // HTTP与推送共享事件编号，查询与重绘不追播。
 }
 function renderSeats(view) {
   seats.replaceChildren();
@@ -241,6 +248,7 @@ function updateCountdown() {
   document.querySelectorAll("[data-grace]").forEach(node => {
     node.textContent = `断线 ${Math.max(0, Math.ceil((Number(node.dataset.grace) - now) / 1000))} 秒` + (node.dataset.labels ? " · " + node.dataset.labels : "");
   });
+  voice.tick(); // 十秒提示依据原服务器期限，不逐秒朗读。
 }
 setInterval(updateCountdown, 250);
 function addAction(action, label) {
@@ -261,16 +269,17 @@ async function sendAction(action) {
   try {
     const response = await fetch("/api/command", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(command)});
     const result = await response.json();
-    render(result);
+    render(result, true);
     if (response.ok && action === "leave") {
       leftRoom = true;
+      voice.reset(); // 离房后不保留自己的旧行动提醒。
       clearTimeout(reconnectTimer);
       if (socket) { socket.onclose = null; socket.close(); socket = null; }
       statusLine.textContent = "已退出房间 · 已投入筹码不退";
       retryButton.textContent = "重新入房";
     }
     if (result.error) await state();
-  } catch { statusLine.textContent = "操作结果待确认，请重新连接查看服务器状态。"; }
+  } catch { statusLine.textContent = "操作结果待确认，请重新连接查看服务器状态。"; voice.fault("connection"); }
   finally { sending = false; if (confirmed) render(confirmed); }
 }
 async function state() {
@@ -291,6 +300,7 @@ function pendingJoin(view) {
 async function connect() {
   if (connecting || takenOver) return;
   connecting = true;
+  voice.reset(); // 重连只提醒恢复后的当前机会。
   leftRoom = false;
   retryButton.textContent = "重新连接";
   retryButton.disabled = true;
@@ -316,6 +326,7 @@ async function connect() {
     throw new Error("房间状态正在变化，请重新连接。");
   } catch (error) {
     statusLine.textContent = error.message || "连接中断，入房结果待确认。请重新连接。";
+    voice.fault("connection");
   } finally { connecting = false; retryButton.disabled = takenOver; }
 }
 function openSocket() {
@@ -325,11 +336,13 @@ function openSocket() {
   connection.onopen = () => { if (socket !== connection) return; retryDelay = 1000; statusLine.textContent = "已入房 · 筹码仅保存在本次服务内存中"; };
   connection.onmessage = event => {
     if (socket !== connection) return;
-    try { render(JSON.parse(event.data)); } catch { statusLine.textContent = "状态读取失败，请重新连接。"; }
+    try { render(JSON.parse(event.data), true); } catch { statusLine.textContent = "状态读取失败，请重新连接。"; voice.fault("connection"); }
   };
   connection.onclose = () => {
     if (socket !== connection || leftRoom || takenOver) return;
     statusLine.textContent = "连接或唤醒中…";
+    voice.reset();
+    voice.fault("connection");
     reconnectTimer = setTimeout(connect, retryDelay);
     retryDelay = Math.min(retryDelay * 2, 15000);
   };

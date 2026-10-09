@@ -86,6 +86,11 @@ func (a *App) apply(id string, cmd command) (outcome, bool) {
 	} else if control.PageID == cmd.PageID && control.Generation != cmd.Control {
 		rejection = "taken_over"
 	} else {
+		kind := "join"                 // 首次占用空位。
+		if a.state.Seats[seat] == id { // 同身份成功重新入房。
+			kind = "return" // 不重新播历史事件。
+		}
+		a.state.announce(announcement{Kind: kind, Seat: seat}) // 与已确认入房事务一起发布。
 		// 每次成功的新入房请求（含重连）将可用余额设100，入房先后另行保留。
 		joinedVersion := a.state.Version + 1 // 以串行确认版本记录本次占座先后，不受低号空位影响。
 		if a.state.Seats[seat] == id {       // 同身份重连或接管仍是原来的在房成员。
@@ -95,6 +100,7 @@ func (a *App) apply(id string, cmd command) (outcome, bool) {
 		a.state.Seats[seat] = id
 		if a.state.Host == "" {
 			a.state.Host = id
+			a.state.announce(announcement{Kind: "host", Seat: seat}) // 第一名玩家也明确房主身份。
 		}
 		a.state.Version++
 		if control.Seen == nil {
@@ -121,9 +127,13 @@ func (a *App) apply(id string, cmd command) (outcome, bool) {
 		delete(a.active, id)
 	}
 	if rejection == "" {
+		a.commitAnnouncements() // 不为回滚或重复请求创建新事件。
 		a.scheduleLocked()
 	}
 	result.View = a.visibleTo(id)
+	if rejection == "" { // HTTP与WebSocket带相同事件身份，页面自行去重。
+		result.View.Announcements = append([]announcement(nil), a.announcements...)
+	}
 	if rejection != "" {
 		result.Status = http.StatusConflict
 		result.View.Error = rejection

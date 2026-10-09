@@ -26,6 +26,7 @@ type App struct {
 	timer           Timer
 	wake            *int
 	fault           string
+	announcements   []announcement
 }
 
 // Options controls cards, time and action-start randomness offline, never via HTTP.

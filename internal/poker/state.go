@@ -13,15 +13,16 @@ type player struct {
 }
 
 type room struct {
-	Version      int64                  `json:"version"`
-	Accounts     map[string]player      `json:"accounts"`
-	Seats        [humanSeatCount]string `json:"seats"`
-	Host         string                 `json:"host"`
-	Bot          player                 `json:"bot"`
-	Hand         *hand
-	Controls     map[string]controller
-	Disconnected map[string]time.Time
-	Connecting   map[string]time.Time
+	Version       int64                  `json:"version"`
+	Accounts      map[string]player      `json:"accounts"`
+	Seats         [humanSeatCount]string `json:"seats"`
+	Host          string                 `json:"host"`
+	Bot           player                 `json:"bot"`
+	Hand          *hand
+	Controls      map[string]controller
+	Disconnected  map[string]time.Time
+	Connecting    map[string]time.Time
+	announcements []announcement
 }
 
 type controller struct {
@@ -31,15 +32,16 @@ type controller struct {
 }
 
 type view struct {
-	Version    int64                   `json:"version"`
-	You        string                  `json:"you"`
-	Host       string                  `json:"host"`
-	Seats      [humanSeatCount]*player `json:"seats"`
-	Bot        player                  `json:"bot"`
-	Error      string                  `json:"error,omitempty"`
-	Hand       *handView               `json:"hand,omitempty"`
-	Control    int64                   `json:"control"`
-	ServerTime int64                   `json:"serverTime"`
+	Version       int64                   `json:"version"`
+	You           string                  `json:"you"`
+	Host          string                  `json:"host"`
+	Seats         [humanSeatCount]*player `json:"seats"`
+	Bot           player                  `json:"bot"`
+	Error         string                  `json:"error,omitempty"`
+	Hand          *handView               `json:"hand,omitempty"`
+	Control       int64                   `json:"control"`
+	ServerTime    int64                   `json:"serverTime"`
+	Announcements []announcement          `json:"announcements,omitempty"`
 }
 
 func (s room) visibleTo(id string) view {
@@ -71,6 +73,7 @@ func (s room) visibleTo(id string) view {
 // clone creates the rollback boundary for one atomic in-memory command.
 func (s room) clone() room {
 	c := s
+	c.announcements = append([]announcement(nil), s.announcements...) // 事件草稿与扣款共用回滚边界。
 	c.Accounts = make(map[string]player, len(s.Accounts))
 	c.Disconnected = make(map[string]time.Time, len(s.Disconnected))
 	c.Connecting = make(map[string]time.Time, len(s.Connecting))

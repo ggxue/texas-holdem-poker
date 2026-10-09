@@ -70,9 +70,17 @@ func (a *App) serveSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	a.active[id] = c
 	if !a.state.Connecting[id].IsZero() || !a.state.Disconnected[id].IsZero() { // 有效握手才结束连接建立或重连等待。
+		if !a.state.Disconnected[id].IsZero() { // 同控制页直接恢复WS，没有重新入房命令。
+			for seat, occupant := range a.state.Seats { // 仅向原在线收件人报告回来。
+				if occupant == id { // 不给恢复页补播事件。
+					a.state.announce(announcement{Kind: "return", Seat: seat}) // 不改余额或行动期限。
+				}
+			}
+		}
 		delete(a.state.Connecting, id)   // 清除握手阶段期限。
 		delete(a.state.Disconnected, id) // 清除已观察断线的期限。
 		a.state.Version++                // 连接已建立也是权威状态更新。
+		a.commitAnnouncements()          // 与成功控制连接共同确认。
 		a.broadcast(a.state)             // 向仍有效的控制页同步恢复。
 		a.scheduleLocked()               // 保留原行动期限，取消失效的连接期限。
 	}
@@ -154,12 +162,14 @@ func (a *App) queue(c *connection, v view) {
 }
 
 func (a *App) broadcast(state room) {
+	defer func() { a.announcements = nil }() // 广播后丢弃瞬时事件；新连接不补历史。
 	for c := range a.clients {
 		control := state.Controls[c.id]
 		if control.PageID == c.pageID && control.Generation == c.generation && a.active[c.id] == c {
 			v := state.visibleTo(c.id)
 			v.ServerTime = a.clock.Now().UnixMilli()
 			v.Error = a.fault
+			v.Announcements = a.announcements // 同一次提交的所有在线收件人共享公开事件。
 			a.queue(c, v)
 		}
 	}

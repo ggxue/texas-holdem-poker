@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/style.css">
   <script defer src="/cards.js"></script>
   <script defer src="/chips.js"></script>
+  <script defer src="/voice.js"></script>
   <script defer src="/app.js"></script>
 </head>
 <body>
@@ -14,7 +15,7 @@
     <header class="app-header">
       <div class="brand"><span class="brand-mark" aria-hidden="true">♠</span><div><h1>在线德州扑克</h1><span class="eyebrow">TEXAS POKER</span></div></div>
       <section class="status-bar" aria-label="牌局与连接状态"><div class="headline"><strong id="game-info">等待房主开始</strong><span id="countdown" aria-live="off"></span></div><p id="status" role="status" aria-live="polite">正在连接房间…</p></section>
-      <div class="header-controls"><button id="sound-toggle" type="button" disabled>启用声音</button><label class="volume-control">音量<input id="volume" type="range" min="0" max="100" value="60" aria-label="播报音量" disabled></label><button id="retry" type="button">重新连接</button><button id="leave" type="button" disabled>退出房间</button></div>
+      <div class="header-controls"><button id="sound-toggle" type="button">启用声音</button><label class="volume-control">音量<input id="volume" type="range" min="0" max="100" value="60" aria-label="播报音量"></label><button id="retry" type="button">重新连接</button><button id="leave" type="button" disabled>退出房间</button></div>
     </header>
     <div class="play-layout">
       <details class="hand-reference" open><summary>牌型参考 <span>强 → 弱</span></summary><div id="reference-list"></div></details>

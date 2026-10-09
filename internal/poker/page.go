@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"embed"
 	"net/http"
+	"path"
+	"strings"
 	"time"
 )
 
@@ -21,11 +23,17 @@ func servePage(w http.ResponseWriter, r *http.Request) {
 		file = "cards.js" // 仍只提供固定白名单静态文件。
 	case "/chips.js": // 本地矢量筹码只表示权威余额的粗略规模。
 		file = "chips.js" // 与牌面一样不接入外部图片源。
+	case "/voice.js": // 播报只使用本地录音，不依赖运行时TTS。
+		file = "voice.js" // 固定模块白名单。
 	case "/style.css":
 		file = "style.css"
 	default:
-		http.NotFound(w, r)
-		return
+		if strings.HasPrefix(r.URL.Path, "/audio/") && path.Base(r.URL.Path) == strings.TrimPrefix(r.URL.Path, "/audio/") { // 只允许音频目录下的直接文件。
+			file = strings.TrimPrefix(r.URL.Path, "/") // embed目录仍是唯一来源。
+		} else { // 拒绝目录穿越或未知页面。
+			http.NotFound(w, r)
+			return
+		}
 	}
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -33,7 +41,7 @@ func servePage(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := pages.ReadFile("web/" + file)
 	if err != nil {
-		http.Error(w, "页面暂不可用", http.StatusInternalServerError)
+		http.NotFound(w, r) // 不暴露文件系统错误，音频失败由页面可见处理。
 		return
 	}
 	w.Header().Set("X-Content-Type-Options", "nosniff")
