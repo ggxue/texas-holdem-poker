@@ -27,6 +27,21 @@ GoLand 的 Go SDK 可以选择这个目录。Go 构建、模块和测试缓存�
 任一失败都会返回非零退出码，继续显示其他检查结果。涉及并发行为时使用 `-Race`；
 Windows race 检查还需要可用的 C 编译器，缺少时不会被当作通过。
 
+## Commit message check
+
+所有分支的每次提交（包括原型、文档）均遵循AGENTS.md的`<type>: <summary>`格式。
+[commit-msg hook](../../.githooks/commit-msg)拒绝缺少小写类型、冒号空格或摘要的标题。
+每个clone启用一次，绝对路径使本仓库的旧worktree也使用同一校验；其他仓库不受影响：
+
+```powershell
+$taskHooks = Join-Path (git rev-parse --show-toplevel) '.githooks'
+git config --local core.hooksPath $taskHooks
+```
+
+已有自定义hooks配置时先保留并整合原校验。本次仓库原先仅有Git示例hook，已启用上述路径。
+验证使用ignored `artifacts/commit-message-qa`临时仓库真实提交：
+无前缀、只有类型没有摘要、冒号后无空格均失败；`docs:`、`feat:`、`prototype:`合法标题通过。
+
 ## 技能与会话
 
 新会话应从 `D:/texas-poker` 启动。使用 `$skill-name` 或 `/skills`，集成界面

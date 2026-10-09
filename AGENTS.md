@@ -28,6 +28,11 @@ Do not infer further variants or recovery guarantees.
 - Preserve existing user changes. `$implement` includes a local commit: include only
   its scoped changes. Record the baseline commit before starting implementation;
   ensure the reviewed diff includes that work. Follow any user override.
+- Every commit subject must use `<type>: <summary>`, including prototype and docs
+  commits on every branch (for example `feat:`, `fix:`, `docs:`, `test:`, `prototype:`).
+  Before committing, check the prefix; afterward verify `git log -1 --format=%s`.
+  Enable the repository's [commit-message hook](docs/agents/harness.md#commit-message-check)
+  in each clone so a missing prefix rejects the commit.
 
 ## Agent skills
 

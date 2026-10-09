@@ -1,0 +1,8 @@
+#!/bin/sh
+# Every branch uses a type prefix, including prototype and documentation commits.
+subject=$(head -n 1 "$1" | tr -d '\r')
+if printf '%s\n' "$subject" | LC_ALL=C grep -Eq '^[a-z][a-z0-9-]*: [^[:space:]]'; then
+    exit 0
+fi
+printf '%s\n' 'Commit rejected: use <type>: <summary>, e.g. feat: add all-in action or prototype: clarify action labels.' >&2
+exit 1
