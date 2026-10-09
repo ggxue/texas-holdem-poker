@@ -1,7 +1,7 @@
 # 免费部署
 
 源码仓库为 [ggxue/texas-holdem-poker](https://github.com/ggxue/texas-holdem-poker)，发布分支为master。
-B2界面和中文播报已完成本地验收；当前还没有已验证的公网游戏地址。实际状态及证据见[发布票05](../.scratch/poker-screen-audio/issues/05-release.md)。
+B2界面和中文播报已完成本地验收，源码已上传并核对远端master；当前还没有已验证的公网游戏地址。实际状态及证据见[发布票05](../.scratch/poker-screen-audio/issues/05-release.md)。
 
 ## 推荐入口
 
