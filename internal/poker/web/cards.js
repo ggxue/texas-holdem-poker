@@ -43,7 +43,8 @@ const referenceList = document.getElementById("reference-list"); // 静态参考
 for (const [name, english, examples] of referenceHands) { // 不根据局面改变参考内容。
   const row = document.createElement("div"); // 每类五张示例牌与中英文名称。
   row.className = "reference-row"; // 桌面与手机使用相同内容。
-  const label = document.createElement("div"); // 中英文名称共享标题。
+  const label = document.createElement("div");
+  label.className = "reference-label"; // 中英文名称共享标题。
   const title = document.createElement("strong"); // 中文主名称。
   title.textContent = name; // 使用项目既有术语。
   const translation = document.createElement("small"); // 英文用于对照。
@@ -56,7 +57,7 @@ for (const [name, english, examples] of referenceHands) { // 不根据局面改�
   referenceList.append(row); // 完整强弱顺序常驻桌面。
 }
 const referencePanel = document.querySelector(".hand-reference"); // 一个面板服务两个视口。
-const referenceMobile = matchMedia("(max-width: 1100px)"); // 与布局断点一致，窄窗口保留可用卡片尺寸。
+const referenceMobile = matchMedia("(max-width: 700px)"); // 与布局断点一致，窄窗口保留可用卡片尺寸。
 function adaptReference() { // 换视口时恢复对应入口状态。
   referencePanel.open = !referenceMobile.matches; // 手机默认收起，桌面始终展开。
 }

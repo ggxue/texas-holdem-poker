@@ -47,7 +47,7 @@ async function openPage(width, context) {
   const page = {target, session, context};
   await send('Runtime.enable', {}, session);
   await send('Page.enable', {}, session);
-  await send('Emulation.setDeviceMetricsOverride', {width, height:width < 600 ? 844 : 900, deviceScaleFactor:1, mobile:width < 600}, session);
+  await send('Emulation.setDeviceMetricsOverride', {width, height:width < 600 ? 844 : process.argv.includes('--casino') ? 720 : 900, deviceScaleFactor:1, mobile:width < 600}, session);
   await send('Page.navigate', {url:base}, session);
   return page;
 }
@@ -101,6 +101,7 @@ async function checkLayout(page, mobile) {
   const [one,two,three,four,five,bot] = boxes;
   if (mobile) {
     assert(Math.abs(one.y-two.y)<2 && one.x<two.x && Math.abs(three.y-four.y)<2 && three.y>one.y && three.x<four.x && five.y>four.y && bot.y>five.y, 'phone fixed human rows and bottom bot');
+    assert(await evaluate(page, "[...document.querySelectorAll('.place .wallet')].every(wallet => {const w=wallet.getBoundingClientRect(), s=wallet.parentElement.querySelector('.seat').getBoundingClientRect(); return w.top >= s.bottom && Math.abs((w.left+w.right)/2-(s.left+s.right)/2)<2;})"), 'phone wallet piles must sit below their own player, clear of player information');
   } else {
     assert(Math.abs(three.y-four.y)<2 && Math.abs(four.y-five.y)<2 && three.x<four.x && four.x<five.x && one.y>three.y && two.y>five.y && one.x<two.x && bot.y>one.y, 'desktop fixed top humans3/4/5, left1/right2, bottom bot');
   }
@@ -121,15 +122,15 @@ async function checkCards(page, mobile) {
 async function checkResults(page, early = false) {
   const v = await state(page);
   assert(v.hand.stage === 'finished', 'result requires confirmed settlement');
-  assert(await evaluate(page, "document.getElementById('results') && !document.getElementById('results').hidden && document.getElementById('results').getBoundingClientRect().top >= document.getElementById('actions').getBoundingClientRect().bottom"), 'independent results must be below own actions');
+  assert(await evaluate(page, "document.getElementById('results') && document.getElementById('results').classList.contains('settled') && (innerWidth > 700 ? document.getElementById('results').getBoundingClientRect().left >= document.querySelector('.workspace').getBoundingClientRect().right : document.getElementById('results').getBoundingClientRect().top >= document.getElementById('actions').getBoundingClientRect().bottom)"), 'independent results must be below own actions');
   const text = await evaluate(page, "document.getElementById('results').innerText");
   for (const player of v.hand.players) {
-    const name = player.id === 'bot' ? '机器人' : `真人 ${player.seat+1}`;
-    assert(text.includes(name) && text.includes(`本局投入 ${player.invested} chips`) && text.includes(`结算余额 ${player.balance} chips`), 'settlement snapshot fields missing');
+    const name = player.id === 'bot' ? '机器人' : `玩家 ${player.seat+1}`;
+    assert(text.includes(name) && text.includes(`投入 ${player.invested}`) && text.includes(`结算余额 ${player.balance}`), 'settlement snapshot fields missing');
     if (player.won > 0) assert(text.includes(`获得 ${player.won} chips`) && text.includes('赢家'), 'winner/gain not prominent');
   }
   if (early) assert(!text.includes('Best Five') && text.includes('未强制亮牌'), 'early win forced a hand strength');
-  else assert(text.includes('Best Five'), 'showdown best five missing');
+  else assert(await evaluate(page, "document.querySelectorAll('#results .best-five').length > 0"), 'showdown best five missing');
   assert(await evaluate(page, 'document.documentElement.scrollWidth <= innerWidth'), 'results horizontal overflow');
 }
 async function observeThinking(page) {
@@ -158,6 +159,10 @@ try {
   report.cases.push('health probe without room identity');
   const first = await openPage(1280);
   await wait(first, "confirmed?.seats[0]?.id === confirmed?.you && socket?.readyState === WebSocket.OPEN", 'first entry');
+  if (process.argv.includes('--casino')) {
+    assert(await evaluate(first, "document.documentElement.scrollWidth === 1280 && document.documentElement.scrollHeight === 720"), 'B2 desktop must fit the 1280x720 viewport without scrolling');
+    assert(await evaluate(first, "document.querySelectorAll('.wallet svg').length === 2 && document.querySelector('.seat.mine').textContent.includes('玩家 1') && !document.body.innerText.includes('真人')"), 'occupied player and bot need stacks and player naming');
+  }
   if (process.argv.includes('--layout')) await checkLayout(first, false);
   if (process.argv.includes('--cards')) await checkCards(first, false);
   await action(first, '开始');
@@ -166,6 +171,7 @@ try {
   const second = await openPage(390);
   await wait(second, "confirmed?.seats[1]?.id === confirmed?.you && socket?.readyState === WebSocket.OPEN", 'second entry');
   const waiting = await state(second);
+  if (process.argv.includes('--layout')) await checkLayout(second, true);
   if (process.argv.includes('--cards')) { await checkCards(second, true); assert(await evaluate(second, "document.querySelectorAll('.seat.mine .playing-card').length === 0"), 'waiting entrant must not have dealt cards'); }
   assert(!waiting.hand.players.some(player => player.id === waiting.you), 'mid-hand entrant was dealt');
   for (let i = 0; i < 4; i++) {
@@ -183,11 +189,11 @@ try {
   report.cases.push('one human + bot, mid-hand waiting entrant, four check streets and result');
   if (process.argv.includes('--cards')) report.cases.push('ten reference categories, phone expand/collapse, native card faces/backs, waiting privacy, 0/3/4/5 board progression and chips');
   await action(first, '开始');
-  if (process.argv.includes('--results')) assert(await evaluate(first, "document.getElementById('results').hidden"), 'next hand did not replace old results');
+  if (process.argv.includes('--results')) assert(await evaluate(first, "!document.getElementById('results').classList.contains('settled')"), 'next hand did not replace old results');
   assert((await state(first)).hand.players.length === 3, 'next hand did not include second human');
   const third = await openPage(390);
   await wait(third, "confirmed?.seats[2]?.id === confirmed?.you && socket?.readyState === WebSocket.OPEN", 'third entry');
-  assert(await evaluate(third, "document.querySelectorAll('#seats h2')[2].textContent === '真人 3' && document.querySelectorAll('#seats h2')[5].textContent === '机器人'"), 'human 3 and bot seat labels');
+  assert(await evaluate(third, "document.querySelectorAll('#seats h2')[2].textContent === '玩家 3' && document.querySelectorAll('#seats h2')[5].textContent === '机器人'"), 'human 3 and bot seat labels');
   assert(await evaluate(third, "document.getElementById('seats').textContent.includes('空位')"), 'empty seats must remain visible');
   const fourth = await openPage(1280);
   await wait(fourth, "confirmed?.seats[3]?.id === confirmed?.you && socket?.readyState === WebSocket.OPEN", 'fourth entry');
@@ -236,6 +242,20 @@ try {
       assert(await evaluate(replacement, "document.querySelectorAll('#results .winner').length === 6"), 'six winners not all highlighted');
       assert(await evaluate(fifth, "document.querySelectorAll('#results .winner').length === 6"), 'phone missing tied winners');
     }
+    if (process.argv.includes('--casino')) {
+      assert(await evaluate(replacement, "document.documentElement.scrollHeight === 720 && document.querySelectorAll('.wallet svg').length === 6 && !document.querySelector('.pot svg') && document.querySelectorAll('#results .result-player').length === 6"), 'full settlement must fit one screen with six balances and empty pot');
+      const overflow = await evaluate(replacement, "[...document.querySelectorAll('.seat,.result-player,.results-panel,.reference-row,.app-header,.app-footer')].filter(e=>e.scrollWidth>e.clientWidth+1||e.scrollHeight>e.clientHeight+1).map(e=>e.className)");
+      assert(overflow.length === 0, 'full settlement internal overflow: '+JSON.stringify(overflow));
+      assert(await evaluate(replacement, "[...document.querySelectorAll('.wallet svg')].every(e=>{const a=e.getBoundingClientRect(),b=document.querySelector('.community').getBoundingClientRect();return !(a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top)})"), 'wallet chips overlap public cards or pot');
+      for (const [width,height] of [[1920,720],[1920,900]]) {
+        await send('Emulation.setDeviceMetricsOverride', {width,height,deviceScaleFactor:1,mobile:false}, replacement.session);
+        await new Promise(resolve=>setTimeout(resolve,150));
+        assert(await evaluate(replacement, "document.documentElement.scrollWidth===innerWidth && document.documentElement.scrollHeight===innerHeight && document.getElementById('seats').getBoundingClientRect().bottom<=document.querySelector('.action-panel').getBoundingClientRect().top"), 'wide desktop table must fit above actions');
+        assert(await evaluate(replacement, "[...document.querySelectorAll('.seat,.result-player,.results-panel,.reference-row,.app-header,.app-footer')].every(e=>e.scrollWidth<=e.clientWidth+1&&e.scrollHeight<=e.clientHeight+1)"), 'wide desktop internal overflow');
+      }
+      await send('Emulation.setDeviceMetricsOverride', {width:1280,height:720,deviceScaleFactor:1,mobile:false}, replacement.session);
+      report.cases.push('B2 at 1280x720,1920x720,1920x900: complete six-player settlement, six wallet piles, zero pot pile, no page/panel overflow or public-area overlap');
+    }
     await screenshot(replacement, 'poker-full-results-desktop');
     await screenshot(fifth, 'poker-full-results-mobile');
     report.cases.push('five humans + bot full four-street showdown, desktop and phone multi-winner results and next hand');
@@ -245,11 +265,11 @@ try {
     const actor = await currentHuman([replacement, second, third, fourth, fifth]);
     const actorState = await state(actor);
     const seat = actorState.hand.players.find(player => player.id === actorState.you).seat;
-    assert(await evaluate(actor, `document.getElementById('game-info').textContent.includes('当前行动：真人 ${seat+1}')`), 'human action label missing');
+    assert(await evaluate(actor, `document.getElementById('game-info').textContent.includes('当前行动：玩家 ${seat+1}')`), 'human action label missing');
     await action(actor, '弃牌');
   }
   assert((await state(second)).hand.stage === 'finished', 'fold game not finished');
-  if (process.argv.includes('--results')) { await checkResults(second, true); assert(await evaluate(second, "document.querySelectorAll('#results .card-face').length === 2"), 'early win leaked others holes or concealed own allowed hole'); report.cases.push('separate results below actions, winners/gains, Best Five, historical balance after takeover100, result replacement and early-win privacy'); }
+  if (process.argv.includes('--results')) { await checkResults(second, true); assert(await evaluate(second, "document.querySelectorAll('#results .card-face').length === 2"), 'early win leaked others holes or concealed own allowed hole'); report.cases.push('B2 settlement panel, winners/gains, Best Five, historical balance after takeover100, result replacement and early-win privacy'); }
   report.cases.push('same-cookie takeover, old page stopped reconnect, old close harmless, manual next hand/fold');
   await action(replacement, '退出');
   await wait(second, 'confirmed.host === confirmed.you', 'host transfer');

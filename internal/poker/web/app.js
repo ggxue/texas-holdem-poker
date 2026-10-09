@@ -58,68 +58,33 @@ function render(view) {
   if (confirmed && view.you === confirmed.you && view.version < confirmed.version) return;
   confirmed = view;
   if (view.serverTime > lastServerTime) { lastServerTime = view.serverTime; clockOffset = view.serverTime - Date.now(); }
-  seats.replaceChildren();
-  [...view.seats, view.bot].forEach((player, i) => {
-    const card = document.createElement("article");
-    card.dataset.seat = String(i); // 固定布局只依座位编号，不随观看身份旋转。
-    card.className = "seat" + (player && player.id === view.you ? " mine" : "") + (player && view.hand?.actor === player.id ? " current" : ""); // 本人和当前行动分别突出。
-    const name = document.createElement("h2");
-    name.textContent = i === view.seats.length ? "机器人" : `真人 ${i + 1}`;
-    card.append(name);
-    if (player) {
-      const badge = document.createElement("div");
-      badge.className = "badge";
-      badge.textContent = [player.id === view.you ? "你" : "", player.id === view.host ? "房主" : ""].filter(Boolean).join(" · ");
-      card.append(badge);
-      const participant = view.hand?.players.find(item => item.id === player.id);
-      const hole = document.createElement("div"); // 两张手牌区域位于名称身份之后。
-      hole.className = "hole-cards"; // 空位和待局者不画虚假暗牌。
-      const chips = document.createElement("div"); // 余额仅展示确认视图。
-      chips.className = "chips"; // 金色区分可用筹码。
-      chips.textContent = `${player.chips} chips`; // 统一使用整数chips，图标由样式绘制。
-      const investment = document.createElement("div"); // 投入和状态位于余额之后。
-      investment.className = "investment"; // 与可用余额分别显示。
-      const detail = document.createElement("div"); // 座位状态不和名称混排。
-      detail.className = "seat-status"; // 保留读屏文字。
-      const labels = []; // 各状态来自当前确认视图。
-      if (player.disconnectedUntil) labels.push("断线宽限中"); // 展示原离房计时状态。
-      if (player.connectingUntil) labels.push("正在建立控制连接"); // 握手期间不伪装在线。
-      if (participant) { // 仅本局参赛身份有手牌和投入。
-        if (participant.folded) labels.push("弃牌"); // 弃牌状态仍可辨认。
-        else if (participant.allIn) labels.push("全押"); // 全押标记与余额分开。
-        if (view.hand.actor === player.id) labels.push("当前行动"); // 当前行动与本人高亮同时存在。
-        if (player.id === "bot" && view.hand.botThinking) labels.push("思考中"); // 保留真实等待提示。
-        appendCards(hole, participant.hole || [], 2, !participant.hole?.length); // 有参赛资格才画两张公开牌面或无数据牌背。
-        investment.textContent = `本局投入 ${participant.invested} chips`; // 本局投入由服务端确认。
-      } else { // 没有本局资格不显示已发手牌。
-        labels.push(view.hand && view.hand.stage !== "finished" ? "等待下一局" : "准备开局"); // 空闲成员与待局者分别提示。
-      }
-      detail.textContent = labels.join(" · "); // 用短标签呈现状态。
-      card.append(hole, chips, investment, detail); // 按约定的信息顺序追加。
-    } else { // 空席仍保留固定位置。
-      const empty = document.createElement("div"); // 不制造暗牌或余额。
-      empty.className = "empty"; // 空位采用次要文字。
-      empty.textContent = "空位 · 等待玩家入房"; // 清楚标明可入房的位置。
-      card.append(empty); // 保持六席稳定。
-    }
-    seats.append(card);
-  });
+  renderSeats(view);
   const hand = view.hand;
-  const community = document.createElement("div"); // 中央区域只呈现确认的底池与公共牌。
-  community.className = "community"; // 桌面居中，手机在五名真人之后。
-  const pot = document.createElement("div"); // 底池始终在公共牌上方。
-  pot.className = "pot"; // 独立显示底池数值。
-  pot.textContent = `底池 ${hand?.pot || 0} chips`; // 不使用参考图示例数额或美元单位。
-  const board = document.createElement("div"); // 固定五位不会随发牌移动。
-  board.className = "board"; // 保留公共牌区域。
-  board.setAttribute("aria-label", "公共牌"); // 为五张牌提供区域名称。
-  appendCards(board, hand?.board || [], 5); // 未发牌位仅显示轮廓，阶段沿用0、3、4、5。
-  community.append(pot, board); // 维持底池与公共牌层级。
-  seats.append(community); // 与六个固定席共用区域关系。
+  const community = document.createElement("section");
+  community.className = "community";
+  community.setAttribute("aria-label", "公共牌及底池");
+  const pot = document.createElement("div");
+  pot.className = "pot";
+  const stack = createChipStack(hand?.pot || 0, "pot", "底池");
+  const value = document.createElement("div");
+  value.className = "pot-value";
+  const label = document.createElement("span");
+  label.textContent = hand?.stage === "finished" ? "底池 · 已分配" : "底池";
+  const amount = document.createElement("strong");
+  amount.textContent = `${hand?.pot || 0} chips`;
+  value.append(label, amount);
+  if (stack) pot.append(stack);
+  pot.append(value);
+  const board = document.createElement("div");
+  board.className = "board";
+  board.setAttribute("aria-label", "公共牌");
+  appendCards(board, hand?.board || [], 5);
+  community.append(pot, board);
+  seats.append(community);
   gameInfo.textContent = hand ? stageNames[hand.stage] : "等待房主开始 · 每人底注 1"; // 状态栏在桌面上方。
   if (hand?.actor) {
     const actor = hand.players.find(player => player.id === hand.actor);
-    gameInfo.textContent += ` · 当前行动：${actor?.id === view.bot.id ? "机器人" : `真人 ${(actor?.seat ?? 0) + 1}`}`;
+    gameInfo.textContent += ` · 当前行动：${actor?.id === view.bot.id ? "机器人" : `玩家 ${(actor?.seat ?? 0) + 1}`}`;
     if (hand.botThinking) gameInfo.textContent += " · 思考中";
   }
   actions.replaceChildren();
@@ -138,70 +103,152 @@ function render(view) {
   updateCountdown();
   renderResults(view); // 只在确认结算后展示结果，新局替换旧结果。
 }
-function renderResults(view) { // 呈现已裁剪奖项，不在客户端比牌或计算分池。
-  results.replaceChildren(); // 当前手局状态决定唯一结果区域。
-  results.hidden = view.hand?.stage !== "finished"; // 未结算以及新局不保留上一局面板。
-  if (results.hidden) return; // 不提前推断结果或获胜者。
-  const heading = document.createElement("h2"); // 结果直接位于操作区域之后。
-  heading.textContent = "本局结果"; // 清楚区分当前可用筹码和结算。
-  const hint = document.createElement("p"); // 解释重连设100与历史快照的关系。
-  hint.className = "result-hint"; // 避免用余额变化改写奖项。
-  hint.textContent = "结算余额为本局快照；当前可用筹码见座位。结果保留至下一局开始。"; // 不增加持久化保证。
-  const list = document.createElement("div"); // 参赛名单来自本局固定身份。
-  list.className = "result-list"; // 多人结果在手机纵向展示。
-  for (const participant of view.hand.players) { // 中途占座者不会继承旧身份结果。
-    const row = document.createElement("article"); // 每名参赛者有独立结果。
-    row.className = "result-player" + (participant.won > 0 ? " winner" : ""); // 仅服务端确认的正奖项突出为赢家。
-    const name = document.createElement("h3"); // 固定本局座位名称，不按当前座位占用者重命名。
-    name.textContent = `${participant.id === "bot" ? "机器人" : `真人 ${participant.seat + 1}`}${participant.id === view.you ? " · 你" : ""}${participant.won > 0 ? " · 赢家" : ""}`; // 本人和赢家同时可辨认。
-    const gain = document.createElement("strong"); // 奖项是已确认金额，不计算余额差。
-    gain.className = "result-gain"; // 强调赢家获得的chips。
-    gain.textContent = `获得 ${participant.won} chips`; // 保留所有参赛者所得，包括零。
-    const wallet = document.createElement("p"); // 投入与结算余额均使用本局快照。
-    wallet.textContent = `本局投入 ${participant.invested} chips · 结算余额 ${participant.balance} chips`; // 接管设100不会修改此处历史余额。
-    row.append(name, gain, wallet); // 先展示姓名、奖项和投入／余额。
-    if (participant.hole?.length) { // 只展示当前身份确有权限查看的手牌。
-      const hole = document.createElement("div"); // 本人或有效摊牌者的确认手牌。
-      hole.className = "result-cards"; // 与桌面牌面共用呈现。
-      hole.setAttribute("aria-label", "手牌"); // 明确与Best Five的区别。
-      appendCards(hole, participant.hole); // 不添加其他玩家暗牌。
-      row.append(hole); // 提前胜出也只显示本人的允许范围。
-    } else { // 不公开的手牌不伪造或重新推算。
-      const concealed = document.createElement("p"); // 说明未公开原因的可见状态。
-      concealed.textContent = "手牌未公开"; // 不是页面隐藏一副完整牌。
-      row.append(concealed); // 保持结果隐私。
+function renderSeats(view) {
+  seats.replaceChildren();
+  [...view.seats, view.bot].forEach((player, i) => {
+    const place = document.createElement("div");
+    place.className = "place";
+    place.dataset.seat = String(i);
+    if (player?.disconnectedUntil) place.classList.add("offline");
+    const seat = document.createElement("article");
+    seat.dataset.seat = String(i);
+    seat.className = "seat";
+    seat.classList.toggle("mine", !!player && player.id === view.you);
+    seat.classList.toggle("current", !!player && player.id === view.hand?.actor);
+    const title = document.createElement("div");
+    title.className = "seat-title";
+    const name = document.createElement("h2");
+    name.textContent = i === view.seats.length ? "机器人" : `玩家 ${i + 1}`;
+    title.append(name);
+    seat.append(title);
+    if (player) {
+      const badge = document.createElement("span");
+      badge.className = "badge";
+      badge.textContent = [player.id === view.you ? "你" : "", player.id === view.host ? "房主" : ""].filter(Boolean).join(" · ");
+      title.append(badge);
+      const p = view.hand?.players.find(item => item.id === player.id);
+      const hole = document.createElement("div");
+      hole.className = "hole-cards";
+      if (p) appendCards(hole, p.hole || [], 2, !p.hole?.length);
+      const money = document.createElement("div");
+      money.className = "seat-money";
+      const chips = document.createElement("strong");
+      chips.className = "chips";
+      chips.textContent = `${player.chips} chips`;
+      const investment = document.createElement("span");
+      investment.className = "investment";
+      investment.textContent = `投入 ${p?.invested || 0} chips`;
+      money.append(chips, investment);
+      const detail = document.createElement("div");
+      detail.className = "seat-status";
+      const labels = [];
+      if (player.disconnectedUntil) { detail.dataset.grace = String(player.disconnectedUntil); labels.push("断线宽限中"); }
+      else if (player.connectingUntil) labels.push("建立连接中");
+      if (p) {
+        if (p.folded) labels.push("弃牌");
+        else if (p.allIn) labels.push("全押");
+        if (view.hand.actor === player.id) labels.push(view.hand.botThinking ? "思考中" : "当前行动");
+        else if (view.hand.stage === "finished") labels.push(p.won > 0 ? "赢家 · 已派奖" : "已结束");
+      } else labels.push(view.hand && view.hand.stage !== "finished" ? "等待下一局" : "准备开局");
+      detail.dataset.labels = labels.slice(player.disconnectedUntil ? 1 : 0).join(" · ");
+      detail.textContent = labels.join(" · ");
+      seat.append(hole, money, detail);
+      const wallet = document.createElement("div");
+      wallet.className = "wallet";
+      wallet.dataset.owner = String(i);
+      const stack = createChipStack(player.chips, "wallet-" + i, name.textContent + "可用筹码");
+      if (stack) wallet.append(stack);
+      place.append(seat, wallet);
+    } else {
+      seat.classList.add("empty");
+      const empty = document.createElement("div");
+      empty.className = "seat-status";
+      empty.textContent = "空位 · 等待入房";
+      seat.append(empty);
+      place.append(seat);
     }
-    const strength = document.createElement("p"); // 牌型必须来自服务端公开结果。
-    if (participant.strength) { // 只有有效摊牌者有Best Five。
-      strength.textContent = `${participant.strength.category} · Best Five`; // 使用既有中文牌型术语。
-      const best = document.createElement("div"); // 五张最佳牌单独排列。
-      best.className = "result-cards best-five"; // 手机也保持可读。
-      appendCards(best, participant.strength.cards); // 不从手牌再执行比牌算法。
-      row.append(strength, best); // 明确区分手牌和最佳五张。
-    } else { // 提前胜出不强制计算或亮牌，弃牌不公开牌型。
-      strength.textContent = participant.folded ? "弃牌 · 无领奖资格" : "提前胜出 · 未强制亮牌"; // 状态来自确认资格。
-      row.append(strength); // 不制造不可见的牌型。
-    }
-    list.append(row); // 保留所有原参赛者，即使已经离房。
+    seats.append(place);
+  });
+}
+function renderResults(view) {
+  results.replaceChildren();
+  const finished = view.hand?.stage === "finished";
+  results.classList.toggle("settled", finished);
+  const heading = document.createElement("h2");
+  heading.textContent = finished ? "本局结算" : "牌局进行中";
+  results.append(heading);
+  if (!finished) {
+    const waiting = document.createElement("p");
+    waiting.className = "result-waiting";
+    waiting.textContent = view.hand ? "结算后，在这里核对全部参赛者的奖项、牌型和最佳五张。其他玩家暗牌保持隐藏。" : "等待房主开始新一局 · 每人底注 1 chips";
+    results.append(waiting);
+    return;
   }
-  results.append(heading, hint, list); // 历史快照直到下一局开始才替换。
+  const total = document.createElement("p");
+  total.className = "result-total";
+  total.textContent = `本局分配 ${view.hand.players.reduce((sum, p) => sum + p.won, 0)} chips`;
+  const hint = document.createElement("p");
+  hint.className = "result-hint";
+  hint.textContent = "结算余额为快照；当前余额见席位。";
+  results.append(total, hint);
+  const list = document.createElement("div");
+  list.className = "result-list";
+  for (const p of view.hand.players) {
+    const row = document.createElement("article");
+    row.className = "result-player" + (p.won > 0 ? " winner" : "");
+    const top = document.createElement("div");
+    top.className = "result-top";
+    const name = document.createElement("h3");
+    name.textContent = `${p.id === "bot" ? "机器人" : `玩家 ${p.seat + 1}`}${p.id === view.you ? " · 你" : ""}${p.won > 0 ? " · 赢家" : ""}`;
+    const gain = document.createElement("strong");
+    gain.className = "result-gain";
+    gain.textContent = `获得 ${p.won} chips`;
+    top.append(name, gain);
+    const money = document.createElement("p");
+    money.className = "result-money";
+    money.textContent = `投入 ${p.invested} · 结算余额 ${p.balance}`;
+    const strength = document.createElement("div");
+    strength.className = "result-strength";
+    const label = document.createElement("span");
+    if (p.strength) {
+      label.textContent = p.strength.category;
+      const best = document.createElement("div");
+      best.className = "result-cards best-five";
+      best.setAttribute("aria-label", "Best Five 最佳五张");
+      appendCards(best, p.strength.cards);
+      strength.append(label, best);
+    } else {
+      label.textContent = p.folded ? "弃牌 · 无领奖资格" : "提前胜出 · 未强制亮牌";
+      strength.append(label);
+      // 本人允许查看的暗牌仍在席位，不给其他人添隐藏的真实牌值。
+      if (p.id === view.you && p.hole?.length) {
+        const ownHole = document.createElement("div");
+        ownHole.className = "result-cards";
+        ownHole.setAttribute("aria-label", "本人的手牌");
+        appendCards(ownHole, p.hole);
+        strength.append(ownHole);
+      }
+    }
+    row.append(top, money, strength);
+    list.append(row);
+  }
+  results.append(list);
 }
 function updateCountdown() {
   if (!confirmed || takenOver || leftRoom) { countdown.textContent = ""; return; }
   const now = Date.now() + clockOffset;
-  const parts = [];
-  if (confirmed.hand?.deadline) parts.push(`当前行动剩余 ${Math.max(0, Math.ceil((confirmed.hand.deadline - now) / 1000))} 秒`);
-  confirmed.seats.forEach((player, seat) => {
-    if (player?.disconnectedUntil) parts.push(`真人 ${seat + 1} 重连宽限 ${Math.max(0, Math.ceil((player.disconnectedUntil - now) / 1000))} 秒`);
+  countdown.textContent = confirmed.hand?.deadline ? `当前行动剩余 ${Math.max(0, Math.ceil((confirmed.hand.deadline - now) / 1000))} 秒` : "";
+  document.querySelectorAll("[data-grace]").forEach(node => {
+    node.textContent = `断线 ${Math.max(0, Math.ceil((Number(node.dataset.grace) - now) / 1000))} 秒` + (node.dataset.labels ? " · " + node.dataset.labels : "");
   });
-  countdown.textContent = parts.join(" · ");
 }
-setInterval(updateCountdown, 1000);
+setInterval(updateCountdown, 250);
 function addAction(action, label) {
   const button = document.createElement("button");
   button.type = "button";
   button.textContent = label;
-  button.disabled = sending;
+  button.disabled = sending || connecting;
+  if (["bet", "call", "start"].includes(action)) button.className = "primary";
   button.addEventListener("click", () => sendAction(action));
   actions.append(button);
 }

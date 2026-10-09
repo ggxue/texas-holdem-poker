@@ -19,6 +19,8 @@ func servePage(w http.ResponseWriter, r *http.Request) {
 		file = "app.js"
 	case "/cards.js": // 卡片与静态牌型参考共用同一呈现模块。
 		file = "cards.js" // 仍只提供固定白名单静态文件。
+	case "/chips.js": // 本地矢量筹码只表示权威余额的粗略规模。
+		file = "chips.js" // 与牌面一样不接入外部图片源。
 	case "/style.css":
 		file = "style.css"
 	default:
