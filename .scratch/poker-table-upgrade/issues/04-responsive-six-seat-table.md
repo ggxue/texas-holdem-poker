@@ -24,7 +24,7 @@ Spec: [升级规格](../spec.md) — U7、U8、U9、U10；UAC22、UAC24–25、U
 
 ## Validation
 
-- Implementation baseline: `94e229eed678a0a2375218ec96e68d5bd7a2c4fc`；2026-10-09开始，复用已确认浏览器交互seam。
+- Implementation baseline: `cb67bfe3cb9c69d03ab43a7f30f5c08aedb9debe`；2026-10-09开始，复用已确认浏览器交互seam。
 - RED：browser-smoke --layout在旧布局因真人3／4／5不处于顶部同排失败。GREEN：新页面在1280／390通过固定座位、顶部状态和连接入口、机器人下方操作、空席／满席、不同观看者、真实整局、待局、房满、接管及房主转移检查。新poker-desktop.png、poker-mobile.png和capacity截图已目视复核；browser-report.json errors为空。
 - verify.ps1全部通过：harness、格式、vet、Go测试、构建。本票仅改前端，未改变并发／计时后端；票03的race基线保持。
 - code-review双轴审查：Standards 0、Spec 0；以固定baseline的cached diff审查待提交工作，提交后复核baseline...HEAD范围。390模拟手机不能替代未完成的实机验收。

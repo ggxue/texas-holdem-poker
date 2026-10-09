@@ -24,7 +24,7 @@ Spec: [升级规格](../spec.md) — U7、U8、U9；UAC23、UAC27（牌面与参
 
 ## Validation
 
-- Implementation baseline: `13edbf10093dea3b22cdc2dcef6a4afe677ce2e4`；2026-10-09开始。
+- Implementation baseline: `2f5ec8a8fa92ae36ce60f9d764ae4a76cf247cf2`；2026-10-09开始。
 - RED：旧页面因缺少完整十类五张示例牌失败；GREEN：Chrome155 browser-smoke --layout --cards通过十类、手机展开／收起、五公共牌位同排、0／3／4／5推进、暗牌和待局权限、底池chips及固定区域。poker-desktop.png、poker-mobile.png、poker-reference-mobile.png新截图已目视核对。十类示例逐个按定义核对，中文同花大顺等与Evaluate术语一致。
 - verify.ps1全通过；窄窗口断点／桌面键盘常驻改进后重新构建成功。未改并发／计时后端。浏览器首轮严格30000ms比较因消息生成毫秒差失败，改100ms测量容差后通过；精确期限仍由手动时钟测试保证。390模拟手机、实机及其他浏览器限制明确保留。
 - code-review独立Standards 0、Spec 0；固定baseline cached diff覆盖本票，提交后复核三点差异范围。

@@ -29,7 +29,7 @@ Spec: [升级规格](../spec.md) — U1、U5、U6、U10；UAC13–21、UAC03（�
 
 ## Validation
 
-- Implementation baseline: `33e1f13857b98e3e64b9ad7bf500105928f96c65`；2026-10-09开始，复用已确认公开命令／身份视图、HTTP／WebSocket和手动时钟seam。
+- Implementation baseline: `102f53b74906585f0610610ced97967818e514c3`；2026-10-09开始，复用已确认公开命令／身份视图、HTTP／WebSocket和手动时钟seam。
 - RED：TestUAC13BotWaitsOneSecondBeforeCheck因旧代码立即机器人Check失败；GREEN：bot_thinking_test.go通过1／8秒边界、短额Call4、同轮1秒后重新抽3秒、显示28秒与下一真人30秒、满席接管原8秒、公开推送隐私、退出立即结算、旧回调和新局、同刻离房优先、全押Runout及随机源失败回滚。旧场景显式使用settledCommand推进离线时钟，新时序案例保留原始gameCommand回执。
 - verify.ps1 -Race通过：harness、格式、vet、全部测试、构建及race。首次回归有三处仍期望即时机器人动作，补显式离线时钟推进后通过；没有增加0秒策略。未穷尽所有并发交错。Chrome155在1280／390宽实际运行browser-smoke通过、errors为空；poker-thinking.png与browser-report.json记录真实思考、查询不重置显示依据、真人新30秒以及满席接管。模拟手机不代表实机。
 - code-review双轴独立审查：Standards 0、Spec 0。固定baseline以git diff --cached审查待提交限定工作；提交后以baseline...HEAD复核范围，原有用户文档不入本票提交。

@@ -24,7 +24,7 @@ Spec: [升级规格](../spec.md) — U8、U9、U10；UAC26、UAC27（结果部�
 
 ## Validation
 
-- Implementation baseline: `82cdccd01df8aa77f9c354bf501f2f8e87bf001a`；2026-10-09开始。
+- Implementation baseline: `4eb7b665a8e3780ab7d034a528f934d2adf6f161`；2026-10-09开始。
 - RED：旧页面完成真实整局后因独立结果区不在操作下方失败。GREEN：Chrome155 --layout --cards --results通过操作下方结果、赢家金额、Best Five、接管设100保持历史余额、新局替换与提前胜出仅保留本人的两张手牌。固定牌序平局、弃牌与提前胜出公开载荷回归保持。
 - 新增scripts/browser-fixture/main.go，仅绑定127.0.0.1:18082，使用公开Options的合法固定牌序和1秒思考；生产程序不引用，不增加在线fixture接口。--full-hand --tie-six完成五真人+bot四轮、共享同花大顺6枚底注各得1、六赢家desktop／phone结果和下一局。browser-tie-report.json及poker-full-results-desktop.png／mobile.png已目视复核。初版验收误假设历史余额至少100，改为本局公开余额加1后通过；游戏代码未因此变更。
 - verify.ps1全通过，包含新增离线fixture程序编译；本票未改并发／计时后端。1280／390为Chrome模拟，实机及其他浏览器仍待验证。

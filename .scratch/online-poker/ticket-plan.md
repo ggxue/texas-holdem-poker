@@ -5,6 +5,14 @@ Type: ticket-plan
 Spec: [当前规格](spec.md)
 Approval: 原12票已批准；2026-10-08按用户明确覆盖决定修订为9张有效实施票。
 
+## 新增升级规格（2026-10-09）
+
+[牌桌布局、五真人容量与机器人思考升级规格](../poker-table-upgrade/spec.md)
+已按用户完整确认发布为ready-for-agent。用户随后确认七票拆分并调用`implement`，
+[升级01–07](../poker-table-upgrade/ticket-plan.md)已完成本地实施、逐票审查与整合验收，
+新增UAC见[独立升级证据](../poker-table-upgrade/acceptance-evidence.md)。
+以下01–12及其原完成证据保留为升级前历史任务范围；票12的真实云访问阻塞保持不变。
+
 ## 当前决定与执行
 
 [内存与重连规则](memory-reset-decision.md)覆盖Q26/Q27和旧AC25。

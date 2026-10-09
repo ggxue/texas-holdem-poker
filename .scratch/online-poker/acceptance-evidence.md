@@ -1,6 +1,10 @@
 # 当前验收证据（2026-10-08）
 
-范围为当前 spec 和 memory-reset-decision；数据库历史要求不执行。
+2026-10-09已发布[升级规格](../poker-table-upgrade/spec.md)。本页记录升级前两真人、
+机器人立即行动和旧布局的历史验收。升级01–07已完成本地实施与验收，
+新增UAC的回链及外部环境限制见[升级验收证据](../poker-table-upgrade/acceptance-evidence.md)。
+
+范围为2026-10-08首版spec及memory-reset-decision；数据库历史要求不执行。
 02的 app_test.go 仍只有 AC07、AC25 两个测试函数，没有扩充02边界测试。
 03–08的逐票 RED/GREEN、baseline、双轴审查见各票 Validation。
 

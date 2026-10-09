@@ -26,11 +26,11 @@ Spec: [升级规格](../spec.md) — U1–U10；UAC28及UAC01–27整体核对
 
 ## Validation
 
-- Implementation baseline: `af317c20ce24b04f8012de6d74fe403938e27c23`；2026-10-09开始，功能票01–06已done。
+- Implementation baseline: `e5f61481d54cb9e85c7759fbb075eb0f8bb37a08`；2026-10-09开始，功能票01–06已done。
 - [独立升级证据](../acceptance-evidence.md)已归档28项UAC→功能票→公开测试／新浏览器回链、适用旧AC与限制；本地Markdown链接及28行完整性检查通过。
 - 新TestUAC28组合首跑GREEN：五真人起点4、思考中离房补位、接管设100保留投入与期限、五身份查询与bot到期并发、短Call4全押后重连仍全押、单池手算50／结算150／下局149、待局和弃牌隐私。最终暂停真实HTTP补查发现UAC25合法按钮提交中缺待确认文字，目标RED后新增顶部独立提示，再GREEN；没改变后端游戏规则。
 - 最终verify.ps1 -Race退出0，内含普通全套Go测试／构建及race；harness、格式、vet、测试、构建、race全通过。新组合测试和提交提示修复后均复验。restart-smoke退出0，重启清空身份／房主／席位／旧局、新入100。production随机和离线3s Chrome155 --layout --cards --results --full-hand --pending（离线另--tie-six）均退出0、errors为空；包括真实30→28、五满席完整四轮、六赢家及手动下一局。
-- code-review独立Standards 0、Spec 0；审查票07 cached diff并复核bb30780以来完整升级，提交提示追加复审亦0。桌面／手机新截图已目视复核；390仍为模拟，实机、其他浏览器与真实云未验证，云票12仍blocked，未部署，不宣称穷尽交错。
+- code-review独立Standards 0、Spec 0；审查票07 cached diff并复核ed60ba6以来完整升级，提交提示追加复审亦0。桌面／手机新截图已目视复核；390仍为模拟，实机、其他浏览器与真实云未验证，云票12仍blocked，未部署，不宣称穷尽交错。
 
 ## Comments
 

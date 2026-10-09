@@ -25,7 +25,7 @@ Spec: [升级规格](../spec.md) — U1、U2、U10；UAC01–05、UAC28（本票
 
 ## Validation
 
-- Implementation baseline: `bb30780165d285fb5f7529d6ac14f006cfc32851`；2026-10-09在当前master开始。本票之外的既有文档／参考图改动保留，不纳入本票提交。
+- Implementation baseline: `ed60ba67b62cb55ceacadfcf37a5824a6dd633a9`；2026-10-09在当前master开始。本票之外的既有文档／参考图改动保留，不纳入本票提交。
 - 已确认seam：公开命令→按身份可见状态、HTTP／WebSocket及真实页面；复用既定测试配置，不增加线上fixture。采用`tdd`与`codebase-design`指导本票实现。
 - 工具链：`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/bootstrap-go.ps1`退出0，核对本地固定Go SDK。
 - RED（容量）：`scripts/test-go.ps1 -Package ./internal/poker -Run '^TestUAC01'`退出1，第三真人被旧实现拒绝为room_full；扩容后同测试退出0。
@@ -39,7 +39,7 @@ Spec: [升级规格](../spec.md) — U1、U2、U10；UAC01–05、UAC28（本票
 - `node --check`检查页面脚本及浏览器烟测脚本退出0。
 - 全套检查首轮因两处旧两真人余额fixture遍历新增空位而越界、持锁清理卡住，已中断为失败（退出1）；补充空位过滤后，受影响AC14–24测试退出0。
 - 最终`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify.ps1 -Race`退出0：Harness、Go版本、格式、vet、全套测试、构建和race全部通过。`git diff --check`及暂存差异检查通过。
-- 双轴审查固定baseline为上述完整SHA，审查命令为`git diff --cached bb30780165d285fb5f7529d6ac14f006cfc32851`（实施在提交前暂存，含新增测试和本票，排除其他既有改动；当时HEAD仍为baseline，提交列表为空）。Standards首轮1条中文注释问题、Spec首轮1条旧fixture验收阻碍，均修正并由各自独立代理复核，最终两轴各0条未关闭发现。
+- 双轴审查固定baseline为上述完整SHA，审查命令为`git diff --cached ed60ba67b62cb55ceacadfcf37a5824a6dd633a9`（实施在提交前暂存，含新增测试和本票，排除其他既有改动；当时HEAD仍为baseline，提交列表为空）。Standards首轮1条中文注释问题、Spec首轮1条旧fixture验收阻碍，均修正并由各自独立代理复核，最终两轴各0条未关闭发现。
 - 限制：本票只完成其容量／身份／房主／基础页面范围；UAC03的思考保持和UAC04的随机起点保持仍由02／03交付，07组合复核。手机为模拟尺寸，实机、其他浏览器及真实云未验证；不宣称所有并发交错已穷尽。
 
 ## Comments

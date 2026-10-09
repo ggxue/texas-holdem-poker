@@ -2,7 +2,8 @@
 
 范围：[升级规格](spec.md) U1–U10、UAC01–28；适用未覆盖的首版规则与[内存决定](../online-poker/memory-reset-decision.md)。这是升级后的新证据，不以旧两真人、即时机器人或旧布局记录替代。01–06逐票已实现、验证、审查和本地提交；07补组合与归档。真实云票12独立保持blocked。
 
-实现起始baseline：`bb30780165d285fb5f7529d6ac14f006cfc32851`。票07起始baseline：`af317c20ce24b04f8012de6d74fe403938e27c23`。审查待提交时用`git diff --cached <baseline>`覆盖工作，提交后用`git diff <baseline>...HEAD`复核范围。既有用户未提交文档保持原状。
+实现起始baseline：`ed60ba67b62cb55ceacadfcf37a5824a6dd633a9`。票07起始baseline：`e5f61481d54cb9e85c7759fbb075eb0f8bb37a08`。审查待提交时用`git diff --cached <baseline>`覆盖工作，提交后用`git diff <baseline>...HEAD`复核范围。实施阶段保留既有未提交需求文档；用户审查前要求统一提交名称并收齐文档，
+其提交引用对应关系与整理范围见[历史整理记录](history-cleanup.md)。整理保留实现树和原验收结果。
 
 ## UAC回链
 

@@ -26,10 +26,10 @@ Spec: [升级规格](../spec.md) — U1、U3、U4、U10；UAC06–12、UAC03–0
 
 ## Validation
 
-- Implementation baseline: `569bb7461643dd110d2573af9f93238c08b3ec7a`；2026-10-09开始，沿用已确认公开命令／身份视图、HTTP／WebSocket及离线配置seam。
+- Implementation baseline: `4ff5d2e77b61d53997b08fdfed9880a35937930e`；2026-10-09开始，沿用已确认公开命令／身份视图、HTTP／WebSocket及离线配置seam。
 - RED：TestUAC06首轮失败（预期真人4行动，实际仍真人1）；实现后通过。TestUAC11首轮失败（真人1得11、真人4得10），统一循环零头后通过。
 - GREEN：scripts/test-go.ps1 -Package ./internal/poker -Run '^TestUAC(0[6-9]|1[0-2])'退出0；action_start_test覆盖UAC06–12，含六候选、空位、全押／离房起点、欠注回应、接管保序、下一局重新抽选及21／23底池手算奖项。verify.ps1 -Race全项退出0；浏览器browser-smoke.mjs localhost:18081退出0、Chrome155、1280／390模拟宽度、errors为空。
-- 双轴审查使用 git diff --cached 569bb7461643dd110d2573af9f93238c08b3ec7a；Spec 0发现，Standards发现新增逻辑缺少逐行中文注释，已补齐后复核。生产策略用crypto/rand.Int无偏抽选，未用统计抽样冒充证明。手机为模拟、实机和云端未验证；旧云票保持独立blocked。
+- 双轴审查使用 git diff --cached 4ff5d2e77b61d53997b08fdfed9880a35937930e；Spec 0发现，Standards发现新增逻辑缺少逐行中文注释，已补齐后复核。生产策略用crypto/rand.Int无偏抽选，未用统计抽样冒充证明。手机为模拟、实机和云端未验证；旧云票保持独立blocked。
 
 ## Comments
 

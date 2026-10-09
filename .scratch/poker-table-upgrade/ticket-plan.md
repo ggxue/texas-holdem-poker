@@ -7,7 +7,8 @@ Breakdown approved: 2026-10-09 (Asia/Singapore)
 Implementation status: done (01–07 local scope complete)
 
 用户已确认七票拆分及以下阻塞关系；本索引发布时只做规划。随后用户调用`implement`并授权持续完成全部票，01–07已完成本地实施、整合验收与分票提交；不启动云部署。
-父规格保持原状。原[交接](handoff.md)是拆票前快照，不应把其中的下一步说明当成票据尚未发布。
+需求契约保持不变；规格的实施状态已同步完成。[交接](handoff.md)提供当前审查入口，
+并保留拆票前历史快照。提交名称和baseline引用整理见[历史整理记录](history-cleanup.md)。
 
 ## Tickets and blocking edges
 
@@ -41,8 +42,8 @@ Implementation status: done (01–07 local scope complete)
 ## Comments
 
 - 2026-10-09：用户回复“可以，确认拆分”，按`to-tickets`发布七个独立本地票据，保留既有未提交文档和父规格。
-- 2026-10-09：票01完成，提交`569bb74`；完整验证含race、Chrome桌面／手机模拟及双轴复审通过，详见本票Validation。索引更新保留在原未提交规划文档中，不混入票01的代码提交。
+- 2026-10-09：票01完成，提交`4ff5d2e`；完整验证含race、Chrome桌面／手机模拟及双轴复审通过，详见本票Validation。索引更新保留在原未提交规划文档中，不混入票01的代码提交。
 
-- 2026-10-09：02提交33e1f13、03提交94e229e、04提交13edbf1、05提交82cdccd、06提交af317c2；对应票据各记录本地检查和双轴审查。07以af317c2继续组合验收，详见[独立升级证据](acceptance-evidence.md)。
+- 2026-10-09：02提交102f53b、03提交cb67bfe、04提交2f5ec8a、05提交4eb7b66、06提交e5f6148；对应票据各记录本地检查和双轴审查。07以e5f6148继续组合验收，详见[独立升级证据](acceptance-evidence.md)。
 
 - 2026-10-09：07完成；新增公开组合、真实HTTP待确认RED／GREEN、最终普通Go／race与production随机／离线3s完整浏览器均通过；Standards 0、Spec 0。全部七票done，完整回链和外部限制见独立升级证据。
