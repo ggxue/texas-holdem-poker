@@ -4,7 +4,7 @@ Date: 2026-10-10（Asia/Singapore）
 Spec: [确认规格](spec.md)
 Tickets: [02](issues/02-active-allin.md)、[03](issues/03-spade-favicon.md)、[04](issues/04-verification-and-update.md)
 Baseline: `0d71575da9400ff48688d7152198d321da36019d`
-Feature commits: `15b683f`（主动全押）、`253caec`（favicon）；最终检查修订SHA及双轴审查范围在票04补录。
+Feature commits: `15b683f`（主动全押）、`253caec`（favicon）、`1c8c399b00c99a11b29de0748cbc14c838cc75eb`（最终回归与交接修订）；后续提交仅归档完成记录。
 
 ## 规则与公开检查
 
@@ -70,7 +70,17 @@ node scripts/browser-allin.mjs http://localhost:18082 --icon
 ## 独立审查
 
 Standards与Spec两个独立agent审查`0d71575...15b683f`均零发现，涵盖金额整数、目标/应答/期限状态转换、事务及并发。
-追加`0d71575...253caec`：favicon两轴零发现；Standards发现实现票02误用决策票状态resolved，已改done。最终完整修订复查在票04记录。无未处理玩法或并发问题。
+追加`0d71575...253caec`：favicon两轴零发现；Standards发现实现票02误用决策票状态resolved，已改done。
+
+## Standards
+
+最终独立复核`0d71575...1c8c399`：0个未解决硬标准问题、0个代码异味。票02状态问题关闭；新增公开差额/短额回归与旧合法动作列表符合标准；记录区分初次失败、修复、本地证据和公网限制，Render交接未扩张范围。
+
+## Spec
+
+最终独立复核`0d71575...1c8c399`：0项发现。主动全押、精确金额、短额单池、中文声音、图标和布局均有公开证据；早先跟注者只补差额，旧行动顺序断言保留。verify/race及三套真实浏览器报告通过。Render步骤符合本地提交和交接要求，保留公网验证边界。
+
+两轴未解决发现分别为0/0，无未处理玩法、状态转换或并发问题；旧云票仍独立未完成。
 
 ## 发布边界
 

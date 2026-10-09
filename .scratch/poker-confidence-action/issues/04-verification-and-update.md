@@ -1,6 +1,6 @@
 # 04：整合验收与Render更新交接
 
-Status: in-progress
+Status: done
 Type: implementation
 Blocked by: 02-active-allin.md, 03-spade-favicon.md
 Spec: [规格](../spec.md)
@@ -12,11 +12,11 @@ Implementation baseline: `253caecc76a8ed15ea1bf7a53d8cdc8b9f2d6c71`
 
 ## Acceptance criteria
 
-- [ ] AAC17及真实媒体/按钮/隐私整合；记录桌面/模拟手机证据及局限。
-- [ ] 仓库bootstrap、verify含race、JS语法、diff检查通过，缺工具不得跳过。
-- [ ] Standards与Spec独立审查包含全部工作；correctness、状态转换、并发问题解决。
-- [ ] scoped local commits完成；记录确切本地SHA和Render更新/验证步骤。
-- [ ] 不猜URL，不把本地测试当公网验收，不自行标旧云票完成或执行部署。
+- [x] AAC17及真实媒体/按钮/隐私整合；记录桌面/模拟手机证据及局限。
+- [x] 仓库bootstrap、verify含race、JS语法、diff检查通过，缺工具不得跳过。
+- [x] Standards与Spec独立审查包含全部工作；correctness、状态转换、并发问题解决。
+- [x] scoped local commits完成；记录确切功能修订SHA和Render更新/验证步骤。
+- [x] 不猜URL，不把本地测试当公网验收，不自行标旧云票完成或执行部署。
 
 ## Public test boundaries
 
@@ -32,4 +32,5 @@ Implementation baseline: `253caecc76a8ed15ea1bf7a53d8cdc8b9f2d6c71`
 - 1280×720六人结算/390px短额手机截图和16/32pxfavicon已人工查看。模拟手机和本地回环限制已记录，不声称真机/公网验收。
 - 初轮Standards和Spec零发现；追加favicon审查Spec零发现，Standards仅票02状态名称（resolved应为done），已修复。
 - 代码保持本地master；Render官方Manual Deploy步骤已核验并更新部署文档。旧云票不改完成状态，无推送/部署或猜测URL。
-- 全功能最终审查范围与提交SHA：待本票最后复核补录。
+- 全功能最终审查范围：`git diff 0d71575da9400ff48688d7152198d321da36019d...1c8c399b00c99a11b29de0748cbc14c838cc75eb`。三次提交`15b683f`、`253caec`、`1c8c399`；全功能修订提交完整SHA为`1c8c399b00c99a11b29de0748cbc14c838cc75eb`。Standards：0未解决硬标准问题/0异味，原状态finding关闭；Spec：0发现。此后仅归档本票完成与审查结果。
+- 自己启动的回环fixture已关闭；核对PID10904命令行属于本轮隔离profile/CDP9237后仅关闭它，保留原9228占用进程。最终本地HEAD用`git rev-parse HEAD`查询，推送master后按部署文档更新已有服务。

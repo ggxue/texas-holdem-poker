@@ -7,7 +7,7 @@ B2界面和中文播报已完成本地验收；用户已在既有Render服务试
 
 本轮已在本地master提交主动全押、精确动作金额、中文全押播报和截图风格黑桃favicon。无需新建服务或修改现有构建/启动设置。
 
-1. 在`D:\texas-poker`打开PowerShell，执行`git push origin master`，确保包含本轮最终提交。
+1. 在`D:\texas-poker`打开PowerShell，执行`git -c credential.username=ggxue push origin master`，使用此前已认证的仓库账号，确保包含本轮最终提交。
 2. 打开Render现有游戏Web Service，核对连接上述仓库和`master`分支。
 3. 在服务的Deploys页面点`Manual Deploy → Deploy latest commit`。项目配置自动部署为Off；实际控制台设置以账号为准。此选项构建所连分支的最新提交，见[Render官方部署说明](https://render.com/docs/deploys#manual-deploys)（2026-10-10核验）。
 4. 等待新部署成为Live，核对Deploys里提交SHA和`git rev-parse HEAD`相同。打开自己实际游戏链接并`Ctrl+F5`，检查标签黑桃和本人行动时的全押金额。
