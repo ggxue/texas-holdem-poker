@@ -27,6 +27,8 @@ func servePage(w http.ResponseWriter, r *http.Request) {
 		file = "voice.js" // 固定模块白名单。
 	case "/style.css":
 		file = "style.css"
+	case "/favicon.svg": // 浏览器标签复用本地黑桃圆章。
+		file = "favicon.svg" // 仍通过固定静态资源白名单提供。
 	default:
 		if strings.HasPrefix(r.URL.Path, "/audio/") && path.Base(r.URL.Path) == strings.TrimPrefix(r.URL.Path, "/audio/") { // 只允许音频目录下的直接文件。
 			file = strings.TrimPrefix(r.URL.Path, "/") // embed目录仍是唯一来源。
