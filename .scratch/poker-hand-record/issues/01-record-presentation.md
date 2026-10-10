@@ -1,6 +1,6 @@
 # 本局记录的呈现方式
 
-Status: open
+Status: resolved
 Type: prototype
 Mode: HITL
 Blocked by: None
@@ -40,9 +40,9 @@ python artifacts/poker-hand-record-prototype/internal/poker/web/prototype-hand-s
 
 | 方案 | 结构 | 审阅重点 |
 | --- | --- | --- |
-| A · 逐步时间线 | 按顺序穿插阶段、公共牌与每一步行动 | 推荐；最贴合“刚才发生了什么”，长局需回看 |
+| A · 逐步时间线 | 按顺序穿插阶段、公共牌与每一步行动 | 原推荐；最贴合“刚才发生了什么”，长局需回看 |
 | B · 下注账本 | 玩家/行动、底池、可用筹码纵向对齐 | 金额易核对，手机文字较密 |
-| C · 按阶段展开 | 展开每个阶段查看完整步骤，当前阶段默认展开 | 长局易定位，早期步骤需要展开 |
+| C · 按阶段展开 | 展开每个阶段查看完整步骤，当前阶段默认展开 | 用户已选；早期步骤需要展开 |
 
 ## Validation
 
@@ -65,9 +65,15 @@ python artifacts/poker-hand-record-prototype/internal/poker/web/prototype-hand-s
 
 ## Answer
 
-原型制作已完成，推荐 A；用户尚未选择，决策保持 open。
-待用户审阅后记录实际选择，再以已确认需求和选定呈现方式制作正式规格。
+2026-10-10，用户选择 **C · 按阶段展开**：“方案展示挺好”。此呈现决策已解决。
+采用按阶段展开、当前阶段默认展开、早期阶段可展开查看完整步骤的结构；
+“过程／结算”、旧到新顺序、回看及完整结果沿用已确认需求。
+后续正式规格以五项需求和 C 为输入，不直接合并原型代码。
 
 ## Comments
 
 2026-10-10：用户“做吧 $prototype”。本轮授权为原型审阅，不延用手机布局的旧实施授权。
+
+2026-10-10：用户选择 C，并提出投入与派奖的筹码动画，要求 research 和 grill-with-docs。
+新增动效正在[独立需求讨论](../../poker-chip-motion/requirements-discussion.md)中核对；
+本次选择没有授权正式实现或部署。
