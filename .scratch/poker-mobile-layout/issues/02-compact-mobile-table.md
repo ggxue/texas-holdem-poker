@@ -1,6 +1,6 @@
 # 02：手机紧凑六席与常驻行动
 
-Status: in-progress
+Status: done
 Type: task
 Blocked by: None
 Spec: [手机紧凑六席规格](../spec.md)
@@ -14,12 +14,12 @@ Implementation baseline: `9b0bba68d0fbbfeb30adbc12ce5dfe15b6b870cf`
 
 ## Acceptance criteria
 
-- [ ] MAC01–03：360×640、390×720、412×780首屏核心内容可见，320×568行动常驻，玩家1/4固定席位正确。
-- [ ] MAC04–05：合法动作与准确金额、待确认禁用和真实响应正常；真实按钮可点击且高度至少44px。
-- [ ] MAC06–07：玩家、结果和参考内容可读完，六人完整结算可看，详情不遮挡操作或泄露暗牌。
-- [ ] MAC08–10：空席、机器人、全押、断线、重入100、声音、恢复、接管及退出沿用原规则，功能入口可访问。
-- [ ] MAC11–12：桌面B2保持原状，生产没有原型工具，真实HTTP/WebSocket牌局通过。
-- [ ] 单票公开边界red→green、完整验证、Standards/Spec分别审查及有类型前缀的本地提交完成。
+- [x] MAC01–03：360×640、390×720、412×780首屏核心内容可见，320×568行动常驻，玩家1/4固定席位正确。
+- [x] MAC04–05：合法动作与准确金额、待确认禁用和真实响应正常；真实按钮可点击且高度至少44px。
+- [x] MAC06–07：玩家、结果和参考内容可读完，六人完整结算可看，详情不遮挡操作或泄露暗牌。
+- [x] MAC08–10：空席、机器人、全押、断线、重入100、声音、恢复、接管及退出沿用原规则，功能入口可访问。
+- [x] MAC11–12：桌面B2保持原状，生产没有原型工具，真实HTTP/WebSocket牌局通过。
+- [x] 单票公开边界red→green、完整验证、Standards/Spec分别审查及有类型前缀的本地提交完成。
 
 ## Public test boundaries
 
@@ -28,7 +28,12 @@ Implementation baseline: `9b0bba68d0fbbfeb30adbc12ce5dfe15b6b870cf`
 
 ## Validation
 
-实施中；记录可复现命令、red失败、green结果、截图及限制后再标done。
+实施提交：`e4e437f40b0c879c1970d20e968151f91eef0725`，`fix: keep mobile poker table and actions visible`。
+
+[验收证据](../acceptance-evidence.md)记录两项预期red、green、15个手机几何场景、真实HTTP/WebSocket
+动作、原有完整牌局及声音回归、完整verify与race、两轴独立审查。全部通过，Standards/Spec均0项
+已确认发现；JavaScript语法、diff空白和文档链接检查通过。限定本地验收，没有部署、远端推送或
+本次手机实机验收，旧云票状态保留。
 
 ## Comments
 

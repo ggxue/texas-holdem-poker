@@ -1,6 +1,6 @@
 # 手机紧凑六席：实施顺序
 
-Status: ready-for-agent
+Status: done
 Spec: [已确认规格](spec.md)
 Implementation baseline: `9b0bba68d0fbbfeb30adbc12ce5dfe15b6b870cf`
 
@@ -12,3 +12,5 @@ Implementation baseline: `9b0bba68d0fbbfeb30adbc12ce5dfe15b6b870cf`
 | 02 | [手机紧凑六席与常驻行动](issues/02-compact-mobile-table.md) | None；原型01已resolved，规格已确认 | 真实牌局的A布局、固定行动区、完整详情与原功能入口，以及手机/桌面公共验收 |
 
 当前不需要预重构；后端规则与传输契约沿用。架构报告候选不纳入本票。
+
+票02已完成本地实施与验收，见[证据及两轴审查](acceptance-evidence.md)。没有部署或远端推送。
