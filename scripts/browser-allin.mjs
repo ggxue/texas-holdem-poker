@@ -41,6 +41,7 @@ try{
  await wait(pages[0],"confirmed.hand.stage==='finished'",'real all-in runout and six-way tie');
  const finished=await state(pages[0]);
  assert(finished.hand.pot===0&&finished.hand.board.length===5&&finished.hand.players.every(p=>p.invested===100&&p.won===100&&p.balance===100),'six-player pool 600 must split 100 each');
+ await evaluate(pages[0],"document.getElementById('tab-settlement').click()");
  assert(await evaluate(pages[0],"document.documentElement.scrollHeight===innerHeight&&document.documentElement.scrollWidth===innerWidth&&[...document.querySelectorAll('#results .result-player')].every(p=>p.getBoundingClientRect().bottom<=innerHeight)"),'desktop six-player results overflow');
  await screenshot(pages[0],'allin-production-six-results');await screenshot(pages[2],'allin-production-mobile');
  assert(await evaluate(pages[2],"document.documentElement.scrollWidth===innerWidth"),'mobile horizontal overflow');

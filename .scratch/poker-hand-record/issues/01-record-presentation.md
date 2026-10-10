@@ -81,3 +81,7 @@ python artifacts/poker-hand-record-prototype/internal/poker/web/prototype-hand-s
 2026-10-10：用户确认筹码动效七项建议，授权更新原型。
 [新动效原型](../../poker-chip-motion/issues/01-motion-presentation.md)保留本问题已选的 C 记录结构；
 其 A/B/C 比较的是动效编排，正式游戏仍未实施。
+
+2026-10-11：用户已选动效 A，授权组合功能 $to-spec、$to-tickets、$implement。
+正式记录 C 的实施与[组合票据](../../poker-hand-experience/ticket-plan.md)及
+[本地验收](../../poker-hand-experience/acceptance-evidence.md)关联；原型作为设计证据保留。

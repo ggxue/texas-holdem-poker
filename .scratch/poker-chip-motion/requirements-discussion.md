@@ -93,3 +93,8 @@ Hand Record（本局记录）等已确认术语。新动效术语待讨论厘清
 
 动效原型已保存到独立分支，入口、固定来源及验证见
 [动效呈现问题](issues/01-motion-presentation.md)。动画 A/B/C 仍待用户选择。
+
+2026-10-11：用户已选择 **A · 弧线抛注**，并明确授权组合记录 C 与动效 A 的规格、票据和正式实施。
+选择与此前七项决定均纳入[组合规格](../poker-hand-experience/spec.md)，
+成果与限制见[本地验收](../poker-hand-experience/acceptance-evidence.md)。
+此前“待用户选择／偏好后续实施”为当时状态，现已由此授权更新。

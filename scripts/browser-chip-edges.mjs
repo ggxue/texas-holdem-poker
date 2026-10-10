@@ -46,6 +46,7 @@ try{
  await client.wait(pages[1],"confirmed?.hand?.stage==='flop'",'others continue while page is frozen');
  await client.send('Page.setWebLifecycleState',{state:'active'},own.session);
  await client.send('Page.bringToFront',{},own.session);
+ await client.send('Emulation.setFocusEmulationEnabled',{enabled:true},own.session);
  await client.wait(own,"!document.hidden&&socket?.readyState===WebSocket.OPEN&&!connecting",'visible and synchronized after actual background return');
  await client.wait(own,"confirmed?.hand?.stage==='flop'",'public flop after bot actual call');
  assert.equal(await client.evaluate(own,'chipProof.length'),beforeBackground,'background return must not replay buffered transfers');

@@ -70,3 +70,8 @@ Decision status: 用户已确认以下五项建议，需求讨论完成
 2026-10-10：用户“做吧 $prototype”，已授权并完成三方案界面原型。
 [呈现方式审阅](issues/01-record-presentation.md)记录来源分支、固定提交和检查结果；
 用户随后已选择 **C · 按阶段展开**，呈现决策已解决，正式实现与部署仍未开始。
+
+2026-10-11：用户选择动效 A，并明确授权将此前拍板更新以 $to-spec、$to-tickets、$implement 一条龙完成。
+后续授权及实现覆盖上述历史时点的“未授权实现”，见[组合规格](../poker-hand-experience/spec.md)、
+[实施计划](../poker-hand-experience/ticket-plan.md)和[本地验收](../poker-hand-experience/acceptance-evidence.md)。
+部署不在本轮范围。

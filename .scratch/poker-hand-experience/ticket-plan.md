@@ -1,6 +1,6 @@
 # 本局记录与筹码动效实施计划
 
-Status: ready-for-agent
+Status: done
 Type: plan
 Spec: spec.md
 Baseline: `7d375e357d31faf550b91ab61e393a63ebf3fcd0`
@@ -15,3 +15,6 @@ Baseline: `7d375e357d31faf550b91ab61e393a63ebf3fcd0`
 | [03：A 弧线筹码动效](issues/03-chip-motion.md) | 02 | 实际投入与派奖动效、去重、关闭／减少动态和手机遮挡处理 |
 
 不修改旧云发布票状态，不部署；完成后给出提交及本地验收证据。
+
+01–03均完成。实现提交 `34fd7b9`、手机跟随修正 `d010bcf`；最终回归与独立审查见
+[验收证据](acceptance-evidence.md)及[审查报告](review.md)。

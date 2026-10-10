@@ -66,7 +66,8 @@ async function checkResults(page, early = false) {
   const v = await state(page);
   assert(v.hand.stage === 'finished', 'result requires confirmed settlement');
   if (await evaluate(page, 'innerWidth<=700')) await evaluate(page, "if(document.querySelector('[data-panel=results]').getAttribute('aria-expanded')!=='true')document.querySelector('[data-panel=results]').click()");
-  assert(await evaluate(page, "document.getElementById('results') && document.getElementById('results').classList.contains('settled') && (innerWidth > 700 ? document.getElementById('results').getBoundingClientRect().left >= document.querySelector('.workspace').getBoundingClientRect().right : document.getElementById('mobile-sheet').getBoundingClientRect().bottom <= document.querySelector('.action-panel').getBoundingClientRect().top)"), 'results must be accessible without covering own actions');
+  await evaluate(page, "document.getElementById('tab-settlement').click()");
+  assert(await evaluate(page, "document.getElementById('results') && document.getElementById('record-settlement').classList.contains('settled') && (innerWidth > 700 ? document.getElementById('results').getBoundingClientRect().left >= document.querySelector('.workspace').getBoundingClientRect().right : document.getElementById('mobile-sheet').getBoundingClientRect().bottom <= document.querySelector('.action-panel').getBoundingClientRect().top)"), 'results must be accessible without covering own actions');
   const text = await evaluate(page, "document.getElementById('results').innerText");
   for (const player of v.hand.players) {
     const name = player.id === 'bot' ? '机器人' : `玩家 ${player.seat+1}`;

@@ -24,6 +24,10 @@ Baseline: `7d375e357d31faf550b91ab61e393a63ebf3fcd0`
 
 ## Validation
 
+收尾补查发现手机首次打开未跟到最新，新增公开浏览器断言先失败，再修正隐藏位置保存／显示恢复。
+关闭再打开回看0、标签往返后手动收起章节遇到新记录仍保留，也已通过。
+修正提交 `d010bcf`，两轴复审无问题；五尺寸结果与手机动效详情再次通过。
+
 生命周期公开测试先因缺失重置／断线／补给事实失败，接入确认事务后通过。HTTP和恢复WS提供同一完整记录，初始公告为空；新服务无旧记录。
 
 通过：test-go.ps1 -Package ./internal/poker -Run ^TestHandRecord；browser-hand-continuity.mjs。浏览器验证回看位置0保持、未读提示、标签返回、历史全押余额0、同席新人原身份标记、新局替换。证据：artifacts/hand-continuity-browser.json（ignored）。race与双轴审查在03票末尾记录。
