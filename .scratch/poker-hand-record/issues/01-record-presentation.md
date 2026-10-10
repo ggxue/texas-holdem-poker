@@ -77,3 +77,7 @@ python artifacts/poker-hand-record-prototype/internal/poker/web/prototype-hand-s
 2026-10-10：用户选择 C，并提出投入与派奖的筹码动画，要求 research 和 grill-with-docs。
 新增动效正在[独立需求讨论](../../poker-chip-motion/requirements-discussion.md)中核对；
 本次选择没有授权正式实现或部署。
+
+2026-10-10：用户确认筹码动效七项建议，授权更新原型。
+[新动效原型](../../poker-chip-motion/issues/01-motion-presentation.md)保留本问题已选的 C 记录结构；
+其 A/B/C 比较的是动效编排，正式游戏仍未实施。
