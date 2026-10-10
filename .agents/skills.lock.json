@@ -137,6 +137,33 @@
       ]
     },
     {
+      "name": "improve-codebase-architecture",
+      "upstreamPath": "skills/engineering/improve-codebase-architecture",
+      "explicitOnly": true,
+      "dependencies": [
+        "codebase-design",
+        "grilling",
+        "domain-modeling"
+      ],
+      "files": [
+        {
+          "path": "agents/openai.yaml",
+          "upstreamSha256": "c8cb20f68ebf0edb4e497bc11ae5fcaa196004e661cd189015b04f4109ced7f1",
+          "installedSha256": "c8cb20f68ebf0edb4e497bc11ae5fcaa196004e661cd189015b04f4109ced7f1"
+        },
+        {
+          "path": "HTML-REPORT.md",
+          "upstreamSha256": "581e8bb5a521e46bbda8ca7e19b15948bed882187108092ebb90c62513b77528",
+          "installedSha256": "581e8bb5a521e46bbda8ca7e19b15948bed882187108092ebb90c62513b77528"
+        },
+        {
+          "path": "SKILL.md",
+          "upstreamSha256": "552240a5ab5cec6b67c15dd1ad6e9f6962b1bca6ce870059a8c2713760c20392",
+          "installedSha256": "552240a5ab5cec6b67c15dd1ad6e9f6962b1bca6ce870059a8c2713760c20392"
+        }
+      ]
+    },
+    {
       "name": "prototype",
       "upstreamPath": "skills/engineering/prototype",
       "explicitOnly": false,

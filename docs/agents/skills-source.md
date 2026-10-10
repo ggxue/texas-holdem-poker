@@ -16,6 +16,8 @@ in `.agents/skills.lock.json`. Run `scripts/verify.ps1 -Stage Harness` after cha
 - Main flow: `grill-with-docs`, `to-spec`, `to-tickets`, `implement`, `code-review`, `retro`.
 - Supporting disciplines: `grilling`, `domain-modeling`, `tdd`, `codebase-design`,
   `research`, `prototype`, `writing-for-agents`.
+- Architecture exploration: `improve-codebase-architecture`, explicitly invoked;
+  uses the existing `codebase-design`, `grilling`, and `domain-modeling` dependencies.
 
 The last three close dependencies found while reading wayfinder and retro. Triage,
 PR generation, and whole-spec parallel implementation are not part of this bootstrap.
