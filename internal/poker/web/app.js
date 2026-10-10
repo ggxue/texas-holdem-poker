@@ -24,6 +24,7 @@ let retryDelay = 1000;
 const voice = createPokerVoice({current:()=>confirmed, now:()=>Date.now()+clockOffset,
   ready:()=>socket?.readyState===WebSocket.OPEN && !connecting && !takenOver && !leftRoom,
   refresh:()=>state()}); // 声音读取确认快照，不能修改计时或余额。
+const mobileTable = createMobileTable(); // 只负责布局与详情，复用同一确认视图。
 const messages = {
   room_full: "房间已满，请稍后再试。",
   unavailable: "服务暂不可用，请稍后重新连接。",
@@ -117,6 +118,7 @@ function render(view, live = false) {
   }
   updateCountdown();
   renderResults(view); // 只在确认结算后展示结果，新局替换旧结果。
+  mobileTable.refresh();
   voice.receive(view, live); // HTTP与推送共享事件编号，查询与重绘不追播。
 }
 function renderSeats(view) {

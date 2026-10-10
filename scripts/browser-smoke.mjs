@@ -42,30 +42,31 @@ async function checkLayout(page, mobile) {
   const boxes = await evaluate(page, "[...document.querySelectorAll('#seats .seat')].map(seat => {const r=seat.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom};})");
   assert(boxes.length === 6, 'six fixed seats missing');
   const [one,two,three,four,five,bot] = boxes;
+  assert(Math.abs(three.y-four.y)<2 && Math.abs(four.y-five.y)<2 && three.x<four.x && four.x<five.x && one.y>three.y && two.y>five.y && one.x<two.x && bot.y>one.y, 'fixed top players3/4/5, left1/right2, bottom bot');
   if (mobile) {
-    assert(Math.abs(one.y-two.y)<2 && one.x<two.x && Math.abs(three.y-four.y)<2 && three.y>one.y && three.x<four.x && five.y>four.y && bot.y>five.y, 'phone fixed human rows and bottom bot');
     assert(await evaluate(page, "[...document.querySelectorAll('.place .wallet')].every(wallet => {const w=wallet.getBoundingClientRect(), s=wallet.parentElement.querySelector('.seat').getBoundingClientRect(); return w.top >= s.bottom && Math.abs((w.left+w.right)/2-(s.left+s.right)/2)<2;})"), 'phone wallet piles must sit below their own player, clear of player information');
-  } else {
-    assert(Math.abs(three.y-four.y)<2 && Math.abs(four.y-five.y)<2 && three.x<four.x && four.x<five.x && one.y>three.y && two.y>five.y && one.x<two.x && bot.y>one.y, 'desktop fixed top humans3/4/5, left1/right2, bottom bot');
   }
-  assert(await evaluate(page, "document.getElementById('game-info').getBoundingClientRect().bottom <= document.getElementById('seats').getBoundingClientRect().top && document.getElementById('actions').getBoundingClientRect().top >= document.querySelectorAll('#seats .seat')[5].getBoundingClientRect().bottom && document.body.innerText.includes('你的操作') && document.getElementById('retry').getBoundingClientRect().bottom < document.getElementById('seats').getBoundingClientRect().top"), 'top status/connection controls or bottom own actions');
+  assert(await evaluate(page, "document.getElementById('game-info').getBoundingClientRect().bottom <= document.getElementById('seats').getBoundingClientRect().top && document.getElementById('actions').getBoundingClientRect().top >= document.querySelectorAll('#seats .seat')[5].getBoundingClientRect().bottom && document.body.innerText.includes('你的操作') && (innerWidth <= 700 ? document.querySelector('[data-panel=more]').getBoundingClientRect().height>0 : document.getElementById('retry').getBoundingClientRect().bottom < document.getElementById('seats').getBoundingClientRect().top)"), 'top status/function entry or bottom own actions');
   assert(await evaluate(page, 'document.documentElement.scrollWidth <= innerWidth'), 'layout horizontal overflow');
 }
 async function checkCards(page, mobile) {
   assert(await evaluate(page, "document.querySelectorAll('.hand-reference .reference-row').length === 10 && [...document.querySelectorAll('.hand-reference .reference-row')].every(row => row.querySelectorAll('.playing-card').length === 5) && document.querySelector('.hand-reference').textContent.includes('同花大顺') && document.querySelector('.hand-reference').textContent.includes('High Card')"), 'complete ten hand categories with five examples');
   assert(await evaluate(page, "document.querySelectorAll('.board .playing-card').length === 5 && document.querySelector('.pot').getBoundingClientRect().bottom < document.querySelector('.board').getBoundingClientRect().top && document.querySelector('.pot').textContent.includes('chips')"), 'five board slots below chips pot');
   if (mobile) {
+    await evaluate(page, "document.querySelector('[data-panel=more]').click()");
     assert(await evaluate(page, "!document.querySelector('.hand-reference').open"), 'phone reference must start collapsed');
     await evaluate(page, "document.querySelector('.hand-reference summary').click()");
     assert(await evaluate(page, "document.querySelector('.hand-reference').open && document.documentElement.scrollWidth <= innerWidth"), 'phone reference cannot expand without overflow');
     await screenshot(page, 'poker-reference-mobile');
     await evaluate(page, "document.querySelector('.hand-reference summary').click()");
+    await evaluate(page, "document.getElementById('mobile-sheet-close').click()");
   } else assert(await evaluate(page, "document.querySelector('.hand-reference').getBoundingClientRect().right <= document.querySelector('.table').getBoundingClientRect().left"), 'desktop reference must stay left');
 }
 async function checkResults(page, early = false) {
   const v = await state(page);
   assert(v.hand.stage === 'finished', 'result requires confirmed settlement');
-  assert(await evaluate(page, "document.getElementById('results') && document.getElementById('results').classList.contains('settled') && (innerWidth > 700 ? document.getElementById('results').getBoundingClientRect().left >= document.querySelector('.workspace').getBoundingClientRect().right : document.getElementById('results').getBoundingClientRect().top >= document.getElementById('actions').getBoundingClientRect().bottom)"), 'independent results must be below own actions');
+  if (await evaluate(page, 'innerWidth<=700')) await evaluate(page, "if(document.querySelector('[data-panel=results]').getAttribute('aria-expanded')!=='true')document.querySelector('[data-panel=results]').click()");
+  assert(await evaluate(page, "document.getElementById('results') && document.getElementById('results').classList.contains('settled') && (innerWidth > 700 ? document.getElementById('results').getBoundingClientRect().left >= document.querySelector('.workspace').getBoundingClientRect().right : document.getElementById('mobile-sheet').getBoundingClientRect().bottom <= document.querySelector('.action-panel').getBoundingClientRect().top)"), 'results must be accessible without covering own actions');
   const text = await evaluate(page, "document.getElementById('results').innerText");
   for (const player of v.hand.players) {
     const name = player.id === 'bot' ? '机器人' : `玩家 ${player.seat+1}`;

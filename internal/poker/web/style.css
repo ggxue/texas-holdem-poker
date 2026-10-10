@@ -16,3 +16,45 @@
 #voice-status{min-width:0;max-width:50%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #action-hint{font-size:14px;color:var(--muted);line-height:1.2;min-width:0}button.allin{color:#fff0ce;border-color:#f1d099;background:repeating-linear-gradient(0deg,#ffffff0b 0 1px,transparent 1px 3px),linear-gradient(145deg,#a63b4e,#642536);box-shadow:inset 0 1px #e89983,0 3px 5px #0006;font-weight:700}button.allin:hover{background:linear-gradient(#b6445b,#7a2940);border-color:#ffe7b6}
 @media(max-width:700px){#voice-status{max-width:100%;white-space:normal}}
+
+/* Mobile A: six fixed seats with a separate, always visible action area. */
+.mobile-tools,.mobile-sheet{display:none}
+@media(max-width:700px){
+  .poker-app{height:100dvh;min-height:0;padding:8px 8px calc(var(--action-height,140px) + 16px + env(safe-area-inset-bottom,0px));grid-template-rows:auto minmax(0,1fr);gap:8px;overflow:hidden}
+  .app-header{display:grid;grid-template-columns:1fr auto;gap:4px 6px;align-items:center}
+  .brand{gap:6px;min-width:0}.brand-mark{width:25px;height:25px;font-size:20px}.brand h1{font-size:16px}.brand .eyebrow{display:none}
+  .header-controls{display:none}.mobile-tools{display:flex;gap:4px}.mobile-tools button{min-height:32px;padding:3px 7px}
+  .status-bar{grid-column:1/-1;order:0;min-width:0;flex-basis:auto;border:0;padding:0}
+  .headline{justify-content:space-between;gap:3px 6px}#status{margin-top:2px;line-height:1.25}#countdown{white-space:nowrap}
+  .play-layout{display:block;min-height:0}.hand-reference,.results-panel,.app-footer{display:none}
+  .workspace{display:block;height:100%;min-height:0;overflow:auto;overscroll-behavior:contain}
+  .table{height:100%;min-height:406px}
+  .seats{height:100%;min-height:406px;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:120px minmax(138px,1fr) 120px;grid-template-areas:'s3 s4 s5' 's1 board s2' '. bot .';padding:8px 6px;gap:6px}
+  .seats::before{inset:0;border-radius:36%;border-width:5px}.seats::after{font-size:90px;width:120px;height:120px;line-height:120px}
+  .place,.place[data-seat='4'],.place[data-seat='5']{width:100%;padding:0 0 20px;min-height:0;justify-self:stretch}
+  .seat,.seat.mine{min-height:0;height:100%;padding:1px;gap:0;justify-content:center}
+  .seat.current{outline-offset:1px}.seat-title{min-height:21px;gap:2px;flex-wrap:wrap}.seat-title h2{font-size:14px}.badge{font-size:12px}.badge:empty{display:none}
+  .hole-cards{min-height:29px;height:29px;gap:3px;margin:1px 0}.hole-cards .playing-card{width:22px;height:28px;padding:2px}.hole-cards .card-rank{font-size:14px}.hole-cards .card-suit{font-size:16px}
+  .seat-money{gap:0;line-height:16px}.chips,.investment{font-size:14px}.investment{font-size:12px}
+  .seat-status{min-height:17px;font-size:14px;padding:1px 0;line-height:1.1}.seat.empty{gap:8px}
+  .place[data-seat] .wallet,.wallet .physical-chips{width:50px;height:24px}.place[data-seat] .wallet{top:auto;bottom:-4px;left:50%;right:auto;transform:translateX(-50%)}
+  .community{padding:0;min-width:0;width:100%}.pot{display:grid;gap:2px;margin:0 0 9px;justify-items:center}.pot .physical-chips{width:62px;height:30px}.pot-value{text-align:center;font-size:14px}.pot-value strong{font-size:20px}
+  .board{gap:2px}.board .playing-card{width:21px;height:32px;padding:2px}.board .card-rank{font-size:14px}.board .card-suit{font-size:17px}
+  .action-panel{position:fixed;z-index:40;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));padding:9px 10px;gap:7px;background:linear-gradient(#422629,#29171d);box-shadow:0 -7px 22px #12090c88}
+  .action-label{flex-wrap:wrap;gap:3px 8px}.action-label h2{font-size:14px}#action-hint{flex-basis:100%;line-height:1.25}
+  #actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;min-height:44px}#actions button{min-height:44px;padding:5px 3px;font-size:14px}#actions button:only-child,#actions .action-empty{grid-column:1/-1}
+  .mobile-tools button[aria-expanded='true']{border-color:var(--gold);background:#674237}
+  .mobile-sheet{position:fixed;z-index:30;top:calc(var(--mobile-header-bottom,90px) + 8px);bottom:calc(var(--action-height,140px) + 24px + env(safe-area-inset-bottom,0px));left:8px;right:8px;display:flex;flex-direction:column;gap:10px;padding:12px;border:1px solid #be9868;border-radius:12px;background:#28191ef5;box-shadow:0 12px 36px #0009;min-height:0}
+  .mobile-sheet-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}.mobile-sheet-heading h2{font-size:16px;color:var(--gold)}.mobile-sheet-heading button{min-height:44px}
+  .mobile-sheet-body{overflow:auto;min-height:0;overscroll-behavior:contain;display:flex;flex-direction:column;gap:12px}
+  .mobile-sheet .header-controls{display:flex;flex-wrap:wrap;margin:0;gap:8px;flex:0 0 auto}.mobile-sheet .header-controls button{min-height:44px}.mobile-sheet .volume-control{min-height:44px}.mobile-sheet .volume-control input{width:110px}
+  .mobile-sheet .hand-reference,.mobile-sheet .app-footer,.mobile-sheet .results-panel{flex:0 0 auto}
+  .mobile-sheet .hand-reference{display:block;min-height:0}.mobile-sheet .hand-reference summary{min-height:44px;pointer-events:auto}.mobile-sheet .hand-reference[open] #reference-list{grid-template-rows:repeat(10,64px)}
+  .mobile-sheet .app-footer{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-height:0;line-height:1.5}.mobile-sheet #voice-status{max-width:100%;overflow:visible;white-space:normal}
+  .mobile-sheet .results-panel{display:block;min-height:0}.mobile-sheet .result-list{display:block}.mobile-sheet .result-player{padding:14px 0}.mobile-sheet .result-waiting{min-height:0}
+  .mobile-roster{display:grid;gap:12px}.mobile-roster .seat{height:auto;min-height:130px;padding:10px;border:1px solid var(--line);border-radius:8px;gap:5px;background:#3a2428}.mobile-roster .seat-title{min-height:25px}.mobile-roster .seat-money{line-height:1.4}.mobile-roster .investment{font-size:14px}
+  .mobile-roster .hole-cards{height:auto;min-height:40px}.mobile-roster .hole-cards .playing-card{width:30px;height:40px}.mobile-roster .seat-money{white-space:normal;overflow-wrap:anywhere}.mobile-roster .seat-status{line-height:1.4}
+}
+@media(max-width:350px){
+  .brand h1{font-size:14px}.mobile-tools button{padding:3px 5px}.seats{padding:6px 4px;gap:4px}.badge{font-size:11px}.board .playing-card{width:18px}.board .card-rank{font-size:12px}
+}

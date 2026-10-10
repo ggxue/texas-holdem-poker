@@ -25,6 +25,8 @@ func servePage(w http.ResponseWriter, r *http.Request) {
 		file = "chips.js" // 与牌面一样不接入外部图片源。
 	case "/voice.js": // 播报只使用本地录音，不依赖运行时TTS。
 		file = "voice.js" // 固定模块白名单。
+	case "/mobile.js": // 手机详情复用原页面内容，不改变牌局传输。
+		file = "mobile.js"
 	case "/style.css":
 		file = "style.css"
 	case "/favicon.svg": // 浏览器标签复用本地黑桃圆章。

@@ -9,12 +9,14 @@
   <script defer src="/cards.js"></script>
   <script defer src="/chips.js"></script>
   <script defer src="/voice.js"></script>
+  <script defer src="/mobile.js"></script>
   <script defer src="/app.js"></script>
 </head>
 <body>
   <main class="poker-app">
     <header class="app-header">
       <div class="brand"><span class="brand-mark" aria-hidden="true">♠</span><div><h1>在线德州扑克</h1><span class="eyebrow">TEXAS POKER</span></div></div>
+      <nav class="mobile-tools" aria-label="手机详情"><button type="button" data-panel="players" aria-controls="mobile-sheet" aria-expanded="false">玩家</button><button type="button" data-panel="results" aria-controls="mobile-sheet" aria-expanded="false">结果</button><button type="button" data-panel="more" aria-controls="mobile-sheet" aria-expanded="false">更多</button></nav>
       <section class="status-bar" aria-label="牌局与连接状态"><div class="headline"><strong id="game-info">等待房主开始</strong><span id="countdown" aria-live="off"></span></div><p id="status" role="status" aria-live="polite">正在连接房间…</p></section>
       <div class="header-controls"><button id="sound-toggle" type="button">启用声音</button><label class="volume-control">音量<input id="volume" type="range" min="0" max="100" value="60" aria-label="播报音量"></label><button id="retry" type="button">重新连接</button><button id="leave" type="button" disabled>退出房间</button></div>
     </header>
@@ -26,6 +28,7 @@
       <section id="results" class="results-panel" aria-label="本局结算结果"></section>
     </div>
     <footer class="app-footer"><span>断线重新进入后筹码补回 100；服务重启会清空本房间。</span><span id="voice-status" role="status">中文声音待启用</span></footer>
+    <aside id="mobile-sheet" class="mobile-sheet" aria-labelledby="mobile-sheet-title" hidden><div class="mobile-sheet-heading"><h2 id="mobile-sheet-title"></h2><button id="mobile-sheet-close" type="button">关闭详情</button></div><div class="mobile-sheet-body"></div></aside>
   </main>
 </body>
 </html>
