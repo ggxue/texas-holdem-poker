@@ -12,16 +12,17 @@ function createHandRecord({panel, renderSettlement}) {
   const scroll=panel.querySelector(".record-scroll"),settlement=panel.querySelector(".record-settlement"),follow=panel.querySelector(".record-follow");
   function node(tag,cls,text){const n=document.createElement(tag);n.className=cls;if(text!==undefined)n.textContent=text;return n;}
   function followHint(){follow.hidden=following||tab!=="process";follow.textContent=unseen?`${unseen} 条新记录 · 回到最新 ↓`:"正在回看 · 回到最新 ↓";}
-  function position(token,top){requestAnimationFrame(()=>{if(token!==generation)return;scroll.scrollTop=following?scroll.scrollHeight:top;if(tab==="process")savedTop=scroll.scrollTop;requestAnimationFrame(()=>{if(token===generation)updating=false;});});}
+  function position(token,top){requestAnimationFrame(()=>{if(token!==generation)return;if(scroll.clientHeight>0){scroll.scrollTop=following?scroll.scrollHeight:top;if(tab==="process")savedTop=scroll.scrollTop;}requestAnimationFrame(()=>{if(token===generation)updating=false;});});}
+  new ResizeObserver(()=>{if(tab!=="process"||!scroll.clientHeight)return;updating=true;position(generation,savedTop);}).observe(scroll); // 手机详情显示或尺寸变化时恢复跟随／回看。
   function select(next){
-    if(tab==="process")savedTop=scroll.scrollTop;
+    if(tab==="process"&&scroll.clientHeight>0)savedTop=scroll.scrollTop;
     updating=true;const token=++generation;tab=next;
     scroll.hidden=tab!=="process";settlement.hidden=tab!=="settlement";panel.classList.toggle("show-settlement",tab==="settlement");
     for(const b of panel.querySelectorAll("[role=tab]"))b.setAttribute("aria-selected",String(b.id===`tab-${tab}`));
     followHint();if(tab==="process")position(token,savedTop);else requestAnimationFrame(()=>{if(token===generation)updating=false;});
   }
   panel.querySelector("#tab-process").onclick=()=>select("process");panel.querySelector("#tab-settlement").onclick=()=>select("settlement");
-  scroll.addEventListener("scroll",()=>{if(updating||tab!=="process")return;savedTop=scroll.scrollTop;following=scroll.scrollHeight-scroll.clientHeight-scroll.scrollTop<16;if(following)unseen=0;followHint();});
+  scroll.addEventListener("scroll",()=>{if(updating||tab!=="process"||!scroll.clientHeight)return;savedTop=scroll.scrollTop;following=scroll.scrollHeight-scroll.clientHeight-scroll.scrollTop<16;if(following)unseen=0;followHint();});
   follow.onclick=()=>{following=true;unseen=0;scroll.scrollTop=scroll.scrollHeight;followHint();};
   function participant(e,view){
     if(!e.participantID)return "牌桌";
@@ -48,7 +49,7 @@ function createHandRecord({panel, renderSettlement}) {
     if(identity===view.you&&handKey===key&&version===view.version)return;
     const changed=identity!==view.you||handKey!==key;
     if(changed){identity=view.you;handKey=key;opened.clear();count=0;following=true;unseen=0;savedTop=0;select("process");}
-    const previousTop=tab==="process"?scroll.scrollTop:savedTop,records=view.hand?.record||[],added=Math.max(0,records.length-count);
+    const previousTop=tab==="process"&&scroll.clientHeight>0?scroll.scrollTop:savedTop,records=view.hand?.record||[],added=Math.max(0,records.length-count);
     version=view.version;count=records.length;
     if(!following)unseen+=added;
     const token=++generation;updating=true;const fragment=document.createDocumentFragment(),groups=[];
@@ -59,7 +60,8 @@ function createHandRecord({panel, renderSettlement}) {
       const content=node("div","chapter-content"),board=g.entries.find(e=>["flop","turn","river"].includes(e.kind))?.board;
       if(board?.length){const cards=node("div","record-board");appendCards(cards,board);content.append(cards);}
       for(const e of g.entries)content.append(entry(e,view));chapter.append(content);
-      chapter.addEventListener("toggle",()=>{if(chapter.isConnected&&token===generation)opened.set(g.stage,chapter.open);});fragment.append(chapter);
+      let knownOpen=chapter.open;
+      chapter.addEventListener("toggle",()=>{if(chapter.isConnected&&chapter.open!==knownOpen){knownOpen=chapter.open;opened.set(g.stage,chapter.open);}});fragment.append(chapter); // 初始展开不冒充手动选择，标签／尺寸变化不使手动选择失效。
     }
     if(!records.length)fragment.append(node("p","record-empty","等待房主开始新一局 · 每人底注 1 chips"));
     scroll.replaceChildren(fragment);panel.querySelector(".record-live").textContent=view.hand?.stage==="finished"?"已结束":view.hand?"进行中":"待开局";
