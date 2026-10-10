@@ -1,6 +1,6 @@
 # 筹码投入与派奖的动效呈现
 
-Status: open
+Status: resolved
 Type: prototype
 Mode: HITL
 Blocked by: None
@@ -73,7 +73,9 @@ python artifacts/poker-chip-motion-prototype/internal/poker/web/prototype-hand-s
 
 ## Answer
 
-待用户比较动效 A/B/C。C · 按阶段展开的记录结构已确认，不是本问题待选动画的答案。
+用户选择 **A · 弧线抛注**：“我喜欢 A · 弧线抛注”，并授权规格、票据、实施一条龙完成。
+沿用个体筹码弧线错峰投入与整池聚拢成束派奖；C · 按阶段展开的记录结构保持。
+正式规格及实施记录见[本局体验规格](../../poker-hand-experience/spec.md)。
 
 ## Comments
 

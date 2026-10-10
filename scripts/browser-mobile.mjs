@@ -109,6 +109,7 @@ try {
   }
   await wait(pages[0], 'document.getElementById("game-info").textContent.includes("本局结束")', 'six-player runout');
   await click(pages[0], '[data-panel="results"]');
+  await click(pages[0], '#tab-settlement');
   assert(await evaluate(pages[0], 'document.querySelectorAll("#results .result-player").length===6 && document.querySelectorAll("#results .best-five .card-face").length===30'), 'MAC07: incomplete six-player public settlement');
   const settled=await publicView(pages[0]);
   assert(settled.hand.players.every(p=>p.won===100&&p.balance===100), 'MAC04: six-way single pool600 must split100 each');

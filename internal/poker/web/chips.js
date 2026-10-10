@@ -1,4 +1,11 @@
 "use strict";
+// 飞行用单枚实体筹码；颜色与钱包筹码一致，不逐枚对应金额。
+function createTransferChip(index){
+ const colours=[['#f0d79e','#b38b4e','#60401f'],['#cf6b70','#7d2633','#39141d'],['#f2e9d3','#b7a582','#5e4f37']],c=colours[index%3];
+ const wrapper=document.createElement('div');
+ wrapper.innerHTML=`<svg viewBox="0 0 40 24"><ellipse cx="20" cy="16" rx="18" ry="7" fill="${c[2]}"/><path d="M2 11v5a18 7 0 0 0 36 0v-5" fill="${c[1]}"/><ellipse cx="20" cy="11" rx="18" ry="7" fill="${c[0]}" stroke="${c[2]}"/><ellipse cx="20" cy="11" rx="15" ry="5.5" fill="none" stroke="#fff1d1" stroke-width="2" stroke-dasharray="4 5"/><ellipse cx="20" cy="11" rx="9" ry="3.5" fill="none" stroke="${c[2]}"/><text x="20" y="13" text-anchor="middle" font-size="7" fill="${c[2]}">♠</text></svg>`; // 仅内部固定颜色与模板。
+ return wrapper.firstElementChild;
+}
 // 本地实体筹码：精确金额以席位数字为准，堆只示意余额规模。
 function createChipStack(amount,scope='pot',label='底池'){
  if(!(Number(amount)>0))return null;

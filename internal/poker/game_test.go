@@ -45,6 +45,7 @@ type gameView struct {
 			Balance  int64     `json:"balance"`
 			Strength *Strength `json:"strength"`
 		} `json:"players"`
+		Record []recordFact `json:"record"`
 	} `json:"hand"`
 }
 

@@ -27,6 +27,14 @@ func servePage(w http.ResponseWriter, r *http.Request) {
 		file = "voice.js" // 固定模块白名单。
 	case "/mobile.js": // 手机详情复用原页面内容，不改变牌局传输。
 		file = "mobile.js"
+	case "/hand-record.js": // 公开过程只从确认视图呈现。
+		file = "hand-record.js"
+	case "/hand-record.css": // 本局过程与结算的局部样式。
+		file = "hand-record.css"
+	case "/chip-motion.js": // 动效只消费公开确认记录。
+		file = "chip-motion.js"
+	case "/chip-motion.css": // 筹码层不挡操作与手机详情。
+		file = "chip-motion.css"
 	case "/style.css":
 		file = "style.css"
 	case "/favicon.svg": // 浏览器标签复用本地黑桃圆章。

@@ -98,6 +98,10 @@ func (a *App) apply(id string, cmd command) (outcome, bool) {
 		}
 		a.state.Accounts[id] = player{ID: id, Chips: 100, joinedVersion: joinedVersion} // 设100并保存已确定的本次占座顺序。
 		a.state.Seats[seat] = id
+		a.state.record(handRecordEntry{Kind: kind, ParticipantID: id, Seat: seat}) // 当前局公开过程恢复，不把新身份当旧参赛者。
+		if kind == "return" {                                                      // 成功重新入房单独解释钱包重置。
+			a.state.record(handRecordEntry{Kind: "reset", ParticipantID: id, Seat: seat, Amount: "100", Reason: "reconnect"}) // 旧历史快照不改写。
+		}
 		if a.state.Host == "" {
 			a.state.Host = id
 			a.state.announce(announcement{Kind: "host", Seat: seat}) // 第一名玩家也明确房主身份。

@@ -96,6 +96,7 @@ func (s room) clone() room {
 		h := *s.Hand
 		h.Players = append([]participant(nil), s.Hand.Players...)
 		h.Board = append([]Card(nil), s.Hand.Board...)
+		h.records = copyHandRecord(s.Hand.records) // 草稿、提交标识和历史公共牌共同回滚。
 		c.Hand = &h
 	}
 	return c

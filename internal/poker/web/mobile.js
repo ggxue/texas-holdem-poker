@@ -45,7 +45,7 @@ function createMobileTable() {
     body.replaceChildren();
     panel = button.dataset.panel;
     opener = button;
-    heading.textContent = {players:"玩家详情", results:"本局结果", more:"设置与说明"}[panel];
+    heading.textContent = {players:"玩家详情", results:"本局", more:"设置与说明"}[panel];
     if (panel === "players") players();
     else if (panel === "results") body.append(results);
     else body.append(controls, reference, footer);

@@ -22,39 +22,42 @@ type participant struct {
 	acted    bool
 }
 type hand struct {
-	ID              int64
-	Turn            int64
-	Stage           string
-	Pot             int64
-	Board           []Card
-	Players         []participant
-	Actor           int
-	Start           int
-	Target          int64
-	deck            []Card
-	cursor          int
-	showdown        bool
-	Deadline        time.Time
-	ThinkingStarted time.Time
-	deadlineTurn    int64
+	ID               int64
+	Turn             int64
+	Stage            string
+	Pot              int64
+	Board            []Card
+	Players          []participant
+	Actor            int
+	Start            int
+	Target           int64
+	deck             []Card
+	cursor           int
+	showdown         bool
+	Deadline         time.Time
+	ThinkingStarted  time.Time
+	deadlineTurn     int64
+	records          []handRecordEntry
+	committedRecords int
 }
 type handView struct {
-	ID           int64         `json:"id"`
-	Turn         int64         `json:"turn"`
-	Stage        string        `json:"stage"`
-	Pot          int64         `json:"pot"`
-	Board        []Card        `json:"board"`
-	Players      []participant `json:"players"`
-	Actor        string        `json:"actor"`
-	Target       int64         `json:"target"`
-	Legal        []string      `json:"legal"`
-	CallAmount   string        `json:"callAmount"`
-	CallRequired string        `json:"callRequired"`
-	AllInAmount  string        `json:"allInAmount"`
-	BetAmount    int64         `json:"betAmount"`
-	Deadline     int64         `json:"deadline"`
-	StartSeat    int           `json:"actionStartSeat"`
-	BotThinking  bool          `json:"botThinking"`
+	ID           int64             `json:"id"`
+	Turn         int64             `json:"turn"`
+	Stage        string            `json:"stage"`
+	Pot          int64             `json:"pot"`
+	Board        []Card            `json:"board"`
+	Players      []participant     `json:"players"`
+	Actor        string            `json:"actor"`
+	Target       int64             `json:"target"`
+	Legal        []string          `json:"legal"`
+	CallAmount   string            `json:"callAmount"`
+	CallRequired string            `json:"callRequired"`
+	AllInAmount  string            `json:"allInAmount"`
+	BetAmount    int64             `json:"betAmount"`
+	Deadline     int64             `json:"deadline"`
+	StartSeat    int               `json:"actionStartSeat"`
+	BotThinking  bool              `json:"botThinking"`
+	Record       []handRecordEntry `json:"record"`
 }
 
 func randomBotThinkSeconds() (int, error) {
@@ -120,7 +123,8 @@ func (h *hand) visibleTo(id string) *handView {
 	if h.Stage != "finished" && h.Actor >= 0 { // 只有未结束的牌局存在行动者。
 		v.Actor = h.Players[h.Actor].ID // 公布当前行动身份。
 	}
-	return v // 不发送剩余牌序。
+	v.Record = copyHandRecord(h.records) // 只发送本局已经确认的公开过程。
+	return v                             // 不发送剩余牌序。
 }
 
 func (s *room) balance(id string) int64 {
@@ -182,24 +186,29 @@ func (a *App) gameCommand(id string, cmd command) string {
 		if h.Start < 0 { // 离线配置返回非候选座位也不能开局。
 			return "unavailable" // 保持原余额、名单和底池不变。
 		} // 不接受非参赛座位作为起点。
-		for i := range h.Players { // 每名参赛者只收一次底注并发两张牌。
+		s.Hand = h                                                         // 记录与新牌局草稿一起回滚，不覆盖失败前的已结束局。
+		s.record(handRecordEntry{Kind: "start", Stage: "start", Seat: -1}) // 开局快照在扣底注前。
+		for i := range h.Players {                                         // 每名参赛者只收一次底注并发两张牌。
 			p := &h.Players[i]        // 取得当前参赛者。
 			if s.balance(p.ID) == 0 { // 只有本次参赛者余额归零才免费补给。
-				s.setBalance(p.ID, 100) // 下一局底注前补到100，不给正余额增加筹码。
+				s.setBalance(p.ID, 100)                                                                                                       // 下一局底注前补到100，不给正余额增加筹码。
+				s.record(handRecordEntry{Kind: "refill", Stage: "start", ParticipantID: p.ID, Seat: p.Seat, Amount: "100", Reason: "refill"}) // 补给属于新局且早于底注。
 			}
 		}
 		for i := range h.Players { // 所有检查成功后统一扣款发牌。
-			p := &h.Players[i]                                        // 取得参赛者。
-			s.setBalance(p.ID, s.balance(p.ID)-1)                     // 支付一枚底注。
-			p.Invested = 1                                            // 底注计入总投入，不计入本轮跟注。
-			p.AllIn = s.balance(p.ID) == 0                            // 底注扣完为零即全押。
-			h.Pot++                                                   // 实际扣款进入唯一底池。
-			p.Hole = append([]Card{}, h.deck[h.cursor:h.cursor+2]...) // 发两张唯一的私人手牌。
-			h.cursor += 2                                             // 移动服务端发牌游标。
+			p := &h.Players[i]                                                                                                      // 取得参赛者。
+			s.setBalance(p.ID, s.balance(p.ID)-1)                                                                                   // 支付一枚底注。
+			p.Invested = 1                                                                                                          // 底注计入总投入，不计入本轮跟注。
+			p.AllIn = s.balance(p.ID) == 0                                                                                          // 底注扣完为零即全押。
+			h.Pot++                                                                                                                 // 实际扣款进入唯一底池。
+			s.record(handRecordEntry{Kind: "ante", Stage: "start", ParticipantID: p.ID, Seat: p.Seat, Amount: "1", AllIn: p.AllIn}) // 底注逐步快照。
+			p.Hole = append([]Card{}, h.deck[h.cursor:h.cursor+2]...)                                                               // 发两张唯一的私人手牌。
+			h.cursor += 2                                                                                                           // 移动服务端发牌游标。
 		}
 		s.Hand = h                                        // 提交新牌局。
 		s.announce(announcement{Kind: "start", Seat: -1}) // 开局只确认一次。
 		s.announce(announcement{Kind: "deal", Seat: -1})  // 只说发手牌，不公开任何牌值。
+		s.record(handRecordEntry{Kind: "deal", Seat: -1}) // 只记录发牌环节，不携带暗牌。
 		return s.advance()                                // 自动选择首名可行动者，必要时补齐牌。
 	}
 	h := s.Hand                            // 读取本局。
@@ -313,8 +322,9 @@ func (s *room) revealNextStreet() {
 	case 4: // 已有转牌。
 		h.Stage = "river" // 河牌阶段。
 	}
-	h.deal(n)                                         // 发牌仍只在服务端。
-	s.announce(announcement{Kind: h.Stage, Seat: -1}) // 音频不会携带卡牌信息。
+	h.deal(n)                                          // 发牌仍只在服务端。
+	s.announce(announcement{Kind: h.Stage, Seat: -1})  // 音频不会携带卡牌信息。
+	s.record(handRecordEntry{Kind: h.Stage, Seat: -1}) // 文字过程保留这时已经公开的公共牌。
 }
 
 func (s *room) settle(showdown bool) string {
@@ -365,18 +375,23 @@ func (s *room) settle(showdown bool) string {
 		} // 不允许余额溢出。
 	}
 	if showdown { // 全部金额检查通过才记录摊牌事实。
-		s.announce(announcement{Kind: "showdown", Seat: -1}) // 不读手牌、牌型或最佳五张。
+		s.record(handRecordEntry{Kind: "showdown", Stage: "finished", Seat: -1}) // 不把手牌加入公开记录。
+		s.announce(announcement{Kind: "showdown", Seat: -1})                     // 不读手牌、牌型或最佳五张。
 	}
-	s.announce(announcement{Kind: "settlement", Seat: -1}) // 先结算，再按固定顺序读赢家金额。
-	for j, i := range winners {                            // 检查成功后一起派奖。
+	s.announce(announcement{Kind: "settlement", Seat: -1})                     // 先结算，再按固定顺序读赢家金额。
+	s.record(handRecordEntry{Kind: "settlement", Stage: "finished", Seat: -1}) // 保存待分配的完整池。
+	distributed := int64(0)                                                    // 记录逐项派奖后的池，不更改既有原子结算规则。
+	for j, i := range winners {                                                // 检查成功后一起派奖。
 		gain := share             // 取得平分份额。
 		if int64(j) < remainder { // 只向排在零头范围内的赢家多分一枚。
 			gain++ // 增加一枚零头筹码。
 		} // 分配剩余零头。
-		p := &h.Players[i]                                                                          // 取得赢家身份。
-		p.Won = gain                                                                                // 保存本局奖项供结果页面展示。
-		s.announce(announcement{Kind: "winner", Seat: p.Seat, Amount: strconv.FormatInt(gain, 10)}) // 精确奖项用字符串跨浏览器边界。
-		s.setBalance(p.ID, s.balance(p.ID)+gain)                                                    // 将底池份额转入余额。
+		p := &h.Players[i]                                                                                                                                                                 // 取得赢家身份。
+		p.Won = gain                                                                                                                                                                       // 保存本局奖项供结果页面展示。
+		s.announce(announcement{Kind: "winner", Seat: p.Seat, Amount: strconv.FormatInt(gain, 10)})                                                                                        // 精确奖项用字符串跨浏览器边界。
+		s.setBalance(p.ID, s.balance(p.ID)+gain)                                                                                                                                           // 将底池份额转入余额。
+		distributed += gain                                                                                                                                                                // 仅累计已经入账的实际奖项。
+		s.record(handRecordEntry{Kind: "award", Stage: "finished", ParticipantID: p.ID, Seat: p.Seat, Amount: strconv.FormatInt(gain, 10), Pot: strconv.FormatInt(h.Pot-distributed, 10)}) // 保存入账后余额及剩余池。
 	}
 	for i := range h.Players { // 依次更新各参赛者。
 		h.Players[i].Balance = s.balance(h.Players[i].ID) // 保存该玩家结算时的余额。
@@ -448,17 +463,18 @@ func (s *room) act(action, reason string) string {
 			h.Players[i].acted = false // 让玩家回应新下注。
 		} // 其余未弃牌且非全押玩家重新应答。
 	}
-	s.setBalance(p.ID, s.balance(p.ID)-amount)                                                                                                    // 从本人余额扣除实际金额。
-	p.Street += amount                                                                                                                            // 累加本轮投入。
-	p.Invested += amount                                                                                                                          // 累加本局投入。
-	h.Pot += amount                                                                                                                               // 全部有效投入进单池，不退款。
-	p.AllIn = p.AllIn || s.balance(p.ID) == 0                                                                                                     // 全押资格不因重连补给而重置。
-	p.acted = true                                                                                                                                // 记录当前机会已经完成。
-	s.announce(announcement{Kind: "action", Seat: p.Seat, Action: action, Amount: strconv.FormatInt(amount, 10), AllIn: p.AllIn, Reason: reason}) // 记录实际扣款与确认原因，不从快照猜测动作。
-	return ""                                                                                                                                     // 同一内存变更统一生效。
+	s.setBalance(p.ID, s.balance(p.ID)-amount)                                                                                                                          // 从本人余额扣除实际金额。
+	p.Street += amount                                                                                                                                                  // 累加本轮投入。
+	p.Invested += amount                                                                                                                                                // 累加本局投入。
+	h.Pot += amount                                                                                                                                                     // 全部有效投入进单池，不退款。
+	p.AllIn = p.AllIn || s.balance(p.ID) == 0                                                                                                                           // 全押资格不因重连补给而重置。
+	p.acted = true                                                                                                                                                      // 记录当前机会已经完成。
+	s.announce(announcement{Kind: "action", Seat: p.Seat, Action: action, Amount: strconv.FormatInt(amount, 10), AllIn: p.AllIn, Reason: reason})                       // 记录实际扣款与确认原因，不从快照猜测动作。
+	s.record(handRecordEntry{Kind: "action", ParticipantID: p.ID, Seat: p.Seat, Action: action, Amount: strconv.FormatInt(amount, 10), AllIn: p.AllIn, Reason: reason}) // 保存实际扣款后的公开事实。
+	return ""                                                                                                                                                           // 同一内存变更统一生效。
 }
 
-func (s *room) release(id string) string {
+func (s *room) release(id, reason string) string {
 	seat := -1                         // 查找该身份当前占用的真人座位。
 	for i, occupant := range s.Seats { // 只释放本人座位。
 		if occupant == id { // 确认身份与座位一致。
@@ -469,11 +485,12 @@ func (s *room) release(id string) string {
 	if seat < 0 { // 未入房身份没有可退出的座位。
 		return "not_in_room" // 退出请求不影响任何其他玩家。
 	}
-	delete(s.Disconnected, id)                          // 清除已经确认离房的宽限期限。
-	delete(s.Connecting, id)                            // 清除未建立控制连接的期限。
-	s.announce(announcement{Kind: "leave", Seat: seat}) // 已确认离房，不读钱包余额。
-	s.Seats[seat] = ""                                  // 立即释放座位，剩余余额仍绑定原身份。
-	if s.Host == id {                                   // 房主离开后自动交接。
+	delete(s.Disconnected, id)                                                              // 清除已经确认离房的宽限期限。
+	delete(s.Connecting, id)                                                                // 清除未建立控制连接的期限。
+	s.announce(announcement{Kind: "leave", Seat: seat})                                     // 已确认离房，不读钱包余额。
+	s.record(handRecordEntry{Kind: "leave", ParticipantID: id, Seat: seat, Reason: reason}) // 保留原身份和实际离房原因。
+	s.Seats[seat] = ""                                                                      // 立即释放座位，剩余余额仍绑定原身份。
+	if s.Host == id {                                                                       // 房主离开后自动交接。
 		s.Host = ""                        // 默认无真人时没有房主。
 		for _, occupant := range s.Seats { // 检查全部留房真人，保持其原座位。
 			if occupant != "" && (s.Host == "" || s.Accounts[occupant].joinedVersion < s.Accounts[s.Host].joinedVersion) { // 比较本次占座先后，不使用座位编号。
@@ -492,15 +509,19 @@ func (s *room) release(id string) string {
 	}
 	for i := range h.Players { // 资格绑定开局身份，不绑定可重用座位。
 		if h.Players[i].ID == id { // 仅影响该身份的参赛资格。
-			h.Players[i].Folded = true // 即使全押也失去未结算领奖资格。
-			h.Players[i].acted = true  // 不再等待该玩家应答。
+			wasFolded := h.Players[i].Folded // 已弃牌者离房不伪造第二次弃牌。
+			h.Players[i].Folded = true       // 即使全押也失去未结算领奖资格。
+			h.Players[i].acted = true        // 不再等待该玩家应答。
+			if !wasFolded {                  // 只解释真正发生的资格变更。
+				s.record(handRecordEntry{Kind: "action", ParticipantID: id, Seat: h.Players[i].Seat, Action: "fold", Amount: "0", Reason: "departure"}) // 已投入不退且不触发筹码飞行。
+			}
 		}
 	}
 	return "" // 资格与座位已经更新，统一推进时所有投入不退。
 }
 
 func (s *room) depart(id string) string {
-	if rejection := s.release(id); rejection != "" { // 先释放席位与未结算资格。
+	if rejection := s.release(id, "manual"); rejection != "" { // 先释放席位与未结算资格。
 		return rejection // 无座位时报告无效退出。
 	}
 	if s.Hand != nil && s.Hand.Stage != "finished" { // 未结束牌局才继续推进。

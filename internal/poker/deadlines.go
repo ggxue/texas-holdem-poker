@@ -108,9 +108,9 @@ func (a *App) tickLocked() {
 		rejection := ""                    // 保存本批事件的错误。
 		for _, id := range a.state.Seats { // 同刻多个离房按固定座位批量移除。
 			if id != "" && (a.state.Disconnected[id].Equal(at) || a.state.Connecting[id].Equal(at)) { // 同刻断线与建立连接失败都先确认离房。
-				rejection = a.state.release(id) // 先撤销所有同刻离房资格，不中途派奖。
-				departed = true                 // 标记本刻已发生离房。
-				if rejection != "" {            // 遇到状态错误不能继续。
+				rejection = a.state.release(id, "grace") // 先撤销所有同刻离房资格，不中途派奖。
+				departed = true                          // 标记本刻已发生离房。
+				if rejection != "" {                     // 遇到状态错误不能继续。
 					break // 留给统一回滚。
 				}
 			}
@@ -179,7 +179,8 @@ func (a *App) disconnectLocked(id, pageID string, generation int64) {
 	a.state.Disconnected[id] = a.clock.Now().Add(30 * time.Second) // 已观察断线创建独立30秒宽限。
 	for seat, occupant := range a.state.Seats {                    // 掉线事件只含当前席位。
 		if occupant == id { // 旧页关闭已在前面排除。
-			a.state.announce(announcement{Kind: "disconnect", Seat: seat}) // 不修改行动期限。
+			a.state.announce(announcement{Kind: "disconnect", Seat: seat})                     // 不修改行动期限。
+			a.state.record(handRecordEntry{Kind: "disconnect", ParticipantID: id, Seat: seat}) // 公开历史与已观察断线共同确认。
 		}
 	}
 	a.state.Version++       // 断线标记也是确认的权威状态。

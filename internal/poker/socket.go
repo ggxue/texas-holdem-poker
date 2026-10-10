@@ -73,7 +73,8 @@ func (a *App) serveSocket(w http.ResponseWriter, r *http.Request) {
 		if !a.state.Disconnected[id].IsZero() { // 同控制页直接恢复WS，没有重新入房命令。
 			for seat, occupant := range a.state.Seats { // 仅向原在线收件人报告回来。
 				if occupant == id { // 不给恢复页补播事件。
-					a.state.announce(announcement{Kind: "return", Seat: seat}) // 不改余额或行动期限。
+					a.state.announce(announcement{Kind: "return", Seat: seat})                     // 不改余额或行动期限。
+					a.state.record(handRecordEntry{Kind: "return", ParticipantID: id, Seat: seat}) // 同控制页直接恢复不设100，不补播旧声音。
 				}
 			}
 		}

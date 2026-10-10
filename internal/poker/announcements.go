@@ -24,6 +24,7 @@ func (s *room) announce(e announcement) {
 }
 
 func (a *App) commitAnnouncements() {
+	a.commitHandRecord()                      // 文字记录与瞬时公告在同一次成功提交中确认。
 	for i, e := range a.state.announcements { // 只有成功提交后才赋予事件身份。
 		e.ID = strconv.FormatInt(a.state.Version, 10) + ":" + strconv.Itoa(i) // 同一进程内的版本与序号唯一。
 		e.At = a.clock.Now().UnixMilli()                                      // 使用同一权威时钟。

@@ -6,7 +6,7 @@ const gameInfo = document.getElementById("game-info");
 const actions = document.getElementById("actions");
 const countdown = document.getElementById("countdown");
 const leaveButton = document.getElementById("leave"); // 顶部退出入口保持服务端占座权限。
-const results = document.getElementById("results"); // 结算在独立区域呈现，保留服务器快照。
+const results = document.getElementById("results"); // 本局过程与结算均保留服务器快照。
 const commandStatus = document.getElementById("command-status"); // 提交确认与连接状态分开，避免覆盖故障信息。
 const actionHint = document.getElementById("action-hint"); // 简短说明放在按钮旁，不附加括号状态。
 let clockOffset = 0;
@@ -24,6 +24,8 @@ let retryDelay = 1000;
 const voice = createPokerVoice({current:()=>confirmed, now:()=>Date.now()+clockOffset,
   ready:()=>socket?.readyState===WebSocket.OPEN && !connecting && !takenOver && !leftRoom,
   refresh:()=>state()}); // 声音读取确认快照，不能修改计时或余额。
+const chipMotion = createChipMotion({current:()=>confirmed, ready:()=>socket?.readyState===WebSocket.OPEN&&!connecting&&!takenOver&&!leftRoom, refresh:()=>state()});
+const handRecord = createHandRecord({panel:results, renderSettlement});
 const mobileTable = createMobileTable(); // 只负责布局与详情，复用同一确认视图。
 const messages = {
   room_full: "房间已满，请稍后再试。",
@@ -50,6 +52,7 @@ function render(view, live = false) {
   if (view.error === "taken_over") {
     if (takenOver) return; // HTTP与WS重复接管故障不得截断第一次本人播报。
     voice.reset();
+    chipMotion.reset();
     voice.fault("taken_over");
     takenOver = true;
     clearTimeout(reconnectTimer);
@@ -117,8 +120,9 @@ function render(view, live = false) {
     actions.append(waiting); // 留住清楚的操作入口。
   }
   updateCountdown();
-  renderResults(view); // 只在确认结算后展示结果，新局替换旧结果。
+  renderResults(view); // 本局过程持续追加，结算与新局仍由服务器确认。
   mobileTable.refresh();
+  chipMotion.receive(view, live); // 已确认记录只播放实时新事实，金额已先更新。
   voice.receive(view, live); // HTTP与推送共享事件编号，查询与重绘不追播。
 }
 function renderSeats(view) {
@@ -188,18 +192,19 @@ function renderSeats(view) {
     seats.append(place);
   });
 }
-function renderResults(view) {
-  results.replaceChildren();
+function renderResults(view) { handRecord.receive(view); }
+function renderSettlement(view, container) {
+  container.replaceChildren();
   const finished = view.hand?.stage === "finished";
-  results.classList.toggle("settled", finished);
+  container.classList.toggle("settled", finished);
   const heading = document.createElement("h2");
   heading.textContent = finished ? "本局结算" : "牌局进行中";
-  results.append(heading);
+  container.append(heading);
   if (!finished) {
     const waiting = document.createElement("p");
     waiting.className = "result-waiting";
     waiting.textContent = view.hand ? "结算后，在这里核对全部参赛者的奖项、牌型和最佳五张。其他玩家暗牌保持隐藏。" : "等待房主开始新一局 · 每人底注 1 chips";
-    results.append(waiting);
+    container.append(waiting);
     return;
   }
   const total = document.createElement("p");
@@ -208,7 +213,7 @@ function renderResults(view) {
   const hint = document.createElement("p");
   hint.className = "result-hint";
   hint.textContent = "结算余额为快照；当前余额见席位。";
-  results.append(total, hint);
+  container.append(total, hint);
   const list = document.createElement("div");
   list.className = "result-list";
   for (const p of view.hand.players) {
@@ -250,7 +255,7 @@ function renderResults(view) {
     row.append(top, money, strength);
     list.append(row);
   }
-  results.append(list);
+  container.append(list);
 }
 function updateCountdown() {
   if (!confirmed || takenOver || leftRoom) { countdown.textContent = ""; return; }
@@ -286,7 +291,8 @@ async function sendAction(action) {
     render(result, true);
     if (response.ok && action === "leave") {
       leftRoom = true;
-      voice.reset(); // 离房后不保留自己的旧行动提醒。
+      voice.reset();
+      chipMotion.reset(); // 离房后清理未完成的筹码视觉。
       clearTimeout(reconnectTimer);
       if (socket) { socket.onclose = null; socket.close(); socket = null; }
       statusLine.textContent = "已退出房间 · 已投入筹码不退";
@@ -314,7 +320,8 @@ function pendingJoin(view) {
 async function connect() {
   if (connecting || takenOver) return;
   connecting = true;
-  voice.reset(); // 重连只提醒恢复后的当前机会。
+  voice.reset();
+  chipMotion.reset(); // 重连不追播历史筹码转移。
   leftRoom = false;
   retryButton.textContent = "重新连接";
   retryButton.disabled = true;
@@ -356,6 +363,7 @@ function openSocket() {
     if (socket !== connection || leftRoom || takenOver) return;
     statusLine.textContent = "连接或唤醒中…";
     voice.reset();
+    chipMotion.reset();
     voice.fault("connection");
     reconnectTimer = setTimeout(connect, retryDelay);
     retryDelay = Math.min(retryDelay * 2, 15000);
