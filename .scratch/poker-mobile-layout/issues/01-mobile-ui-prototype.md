@@ -1,10 +1,10 @@
 # 手机界面：对局信息与操作可见性原型
 
-Status: open
+Status: resolved
 Type: prototype
 Mode: HITL
 Blocked by: None
-Prototype status: ready-for-feedback
+Prototype status: selected
 Date: 2026-10-10
 Implementation baseline: 4547e1b8bf1472afd1c8beaf064dc24e01ee502c
 
@@ -24,7 +24,7 @@ Implementation baseline: 4547e1b8bf1472afd1c8beaf064dc24e01ee502c
   不能把旧检查当作真机操作可见性通过，也不据此自行改写已确认规格。
 - 本轮仅原型：保留深红B2风格、固定席位身份、实体筹码、单底池/全押/重连100及既有声音规则。
 - 展示用暂定优先级：公共牌、底池、本人手牌、当前机会与按钮首屏可见；其余详情按需查看。
-  已向用户询问全桌常驻与详情展开的取舍，尚未收到答案，不标为已确认规格。
+  用户随后选择 A：紧凑六席常驻，并确认矮屏局部滚动、行动区常驻与详情按需展开，见[已确认规格](../spec.md)。
 
 ## Primary source
 
@@ -47,7 +47,7 @@ Implementation baseline: 4547e1b8bf1472afd1c8beaf064dc24e01ee502c
 python artifacts/poker-mobile-layout-prototype/internal/poker/web/prototype-mobile-server.py
 ```
 
-默认本机回环地址 `http://localhost:18104/?variant=B`。仅开发原型，生产模式拒绝启动。
+用户选定方案的本机回环地址 `http://localhost:18104/?variant=A`。仅开发原型，生产模式拒绝启动。
 
 ## Validation
 
@@ -73,5 +73,18 @@ JS语法、主工作树Harness（16个技能）、原型工作树Harness（基�
 
 ## Answer
 
-待用户审阅选择方案或组合。未授权以任一展示方案直接替代正式版；后续先保存明确决定，
-再按实际范围补规格、票据及正式实现验证。本票未resolved，桌面原样保留是已确定约束。
+2026-10-10 用户明确选择 **A · 紧凑六席**。本原型回答的布局方向问题已 resolved；
+这不代表正式功能已实现或真机验收完成。桌面 UI 原样保留是已确定约束。
+
+同日用户对精简 grill-with-docs 的两项建议答复“都同意”：
+
+- 可用视口360×640起，六席、公共牌、本人手牌和操作区首屏可见；320×568类矮屏可接受
+  少量牌桌局部滚动，但行动提示和按钮始终可见。
+- 正式版沿用A的底部固定操作区，玩家详情、完整结算和说明按需展开，移除原型审阅栏；桌面保持现状。
+
+已通过 to-spec 保存为[ready-for-agent规格](../spec.md)，保留现有公共测试边界，
+不重问已经确认的游戏规则、声音行为与桌面布局。正式实现与部署尚未开始。
+
+原始 improve-codebase-architecture 工作保留：探索和 HTML 报告阶段已完成，
+两项候选均为 Worth exploring（页面会话协调、App 内部提交协议）；等待用户选择候选后
+才进入设计讨论。手机布局原型推进期间，架构工作未取消，也未实施重构。
