@@ -1,3 +1,4 @@
+// 本文件维护控制页WebSocket并广播确认视图；涉及流程：断线重连与控制页接管、视图构造与推送。
 package poker
 
 import (
@@ -12,12 +13,13 @@ import (
 )
 
 type connection struct {
-	id         string
-	socket     *websocket.Conn
-	send       chan notification
-	ctx        context.Context
-	cancel     context.CancelFunc
-	pageID     string
+	id     string
+	socket *websocket.Conn
+	send   chan notification
+	ctx    context.Context
+	cancel context.CancelFunc
+	pageID string
+	// generation 绑定建立连接时的控制代次，过期连接不能继续收发房间状态。
 	generation int64
 }
 
@@ -26,6 +28,10 @@ type notification struct {
 	terminal bool
 }
 
+// 【断线重连与控制页接管#5/12】校验 socket.go:serveSocket
+// 上一步：#4 announcements.go:commitAnnouncements；下一步：#6 announcements.go:commitAnnouncements
+// 职责：验证控制页并维护连接生命周期。
+// 前置条件：身份、座位、页号与控制代次必须匹配；注册当前连接并可能解除连接宽限；握手不符返回401/403/503。
 func (a *App) serveSocket(w http.ResponseWriter, r *http.Request) {
 	id, credential, err := a.identify(r)
 	if err != nil || credential != "" {
@@ -93,6 +99,7 @@ func (a *App) serveSocket(w http.ResponseWriter, r *http.Request) {
 	socket.SetPongHandler(func(string) error { return socket.SetReadDeadline(time.Now().Add(45 * time.Second)) })
 	writerDone := make(chan struct{})
 	go func() { defer close(writerDone); c.writeLoop() }()
+	// 【断线重连与控制页接管#10/12】连接关闭清理块：仅当前连接可创建断线宽限。
 	defer func() {
 		cancel()
 		_ = socket.Close()
@@ -116,6 +123,10 @@ func (a *App) serveSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// 【断线重连与控制页接管#9/12】收尾 socket.go:connection.writeLoop
+// 上一步：#8 socket.go:queue；下一步：#10 socket.go:serveSocket
+// 【视图构造与推送#8/8】收尾 socket.go:connection.writeLoop
+// 上一步：#7 socket.go:queue；下一步：流程终点：WebSocket视图已写出
 func (c *connection) writeLoop() {
 	defer c.cancel()
 	defer c.socket.Close()
@@ -146,6 +157,12 @@ func (c *connection) writeLoop() {
 	}
 }
 
+// 【断线重连与控制页接管#8/12】广播 socket.go:queue
+// 上一步：#7 socket.go:broadcast；下一步：#9 socket.go:connection.writeLoop
+// 【视图构造与推送#7/8】广播 socket.go:queue
+// 上一步：#6b socket.go:broadcast；下一步：#8 socket.go:connection.writeLoop
+// 职责：隔离慢客户端与房间锁。
+// 前置条件：调用方持有 App.mu；向单连接队列非阻塞入队；编码失败或队列满时关闭该连接。
 // Caller holds the application lock; a slow connection cannot block room commands.
 func (a *App) queue(c *connection, v view) {
 	data, err := json.Marshal(v)
@@ -162,6 +179,7 @@ func (a *App) queue(c *connection, v view) {
 	}
 }
 
+// 【共用】广播身份裁剪状态。
 func (a *App) broadcast(state room) {
 	defer func() { a.announcements = nil }() // 广播后丢弃瞬时事件；新连接不补历史。
 	for c := range a.clients {

@@ -1,3 +1,4 @@
+// 本文件定义房间权威状态与身份视图；涉及流程：玩家动作、机器人与超时、视图构造与推送。
 package poker
 
 import (
@@ -16,22 +17,26 @@ type player struct {
 }
 
 type room struct {
-	Version       int64                  `json:"version"`
-	Accounts      map[string]player      `json:"accounts"`
-	Seats         [humanSeatCount]string `json:"seats"`
-	Host          string                 `json:"host"`
-	Bot           player                 `json:"bot"`
-	Hand          *hand
-	Controls      map[string]controller
+	// Version 是串行确认的房间版本；成功命令和自动状态变更递增。
+	Version  int64                  `json:"version"`
+	Accounts map[string]player      `json:"accounts"`
+	Seats    [humanSeatCount]string `json:"seats"`
+	Host     string                 `json:"host"`
+	Bot      player                 `json:"bot"`
+	Hand     *hand
+	Controls map[string]controller
+	// Disconnected 是已观察断线宽限，Connecting 是接管后等待有效WebSocket的期限。
 	Disconnected  map[string]time.Time
 	Connecting    map[string]time.Time
 	announcements []announcement
 }
 
 type controller struct {
-	PageID     string
+	PageID string
+	// Generation 随成功接管递增，旧页面与旧连接不得再控制或广播。
 	Generation int64
-	Seen       map[string]bool
+	// Seen 记录曾用过的页面标识，旧页面不能借 join 请求夺回控制权。
+	Seen map[string]bool
 }
 
 type view struct {
@@ -47,6 +52,10 @@ type view struct {
 	Announcements []announcement          `json:"announcements,omitempty"`
 }
 
+// 【视图构造与推送#3/8】构造视图 state.go:visibleTo
+// 上一步：#2 deadlines.go:visibleTo；下一步：#4 game.go:hand.visibleTo
+// 职责：裁剪房间状态视图。
+// 前置条件：身份已验证；构造按身份裁剪的房间快照；不改变房间数据。
 func (s room) visibleTo(id string) view {
 	v := view{Version: s.Version, You: id, Host: s.Host, Bot: s.Bot}
 	v.Control = s.Controls[id].Generation
@@ -76,6 +85,12 @@ func (s room) visibleTo(id string) view {
 	return v
 }
 
+// 【玩家动作#5/12】回滚边界 state.go:clone
+// 上一步：#4 commands.go:apply；下一步：#6 game.go:gameCommand
+// 【机器人与超时#5/11】回滚边界 state.go:clone
+// 上一步：#4 deadlines.go:tickLocked；下一步：#6 game.go:act
+// 职责：原子回滚快照。
+// 前置条件：调用方持有 App.mu；复制可变房间状态作为事务快照；无业务拒绝出口。
 // clone creates the rollback boundary for one atomic in-memory command.
 func (s room) clone() room {
 	c := s

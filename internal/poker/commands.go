@@ -1,3 +1,4 @@
+// 本文件校验、去重并原子提交客户端命令；涉及流程：多条流程（共用）。
 package poker
 
 import (
@@ -8,14 +9,19 @@ import (
 	"time"
 )
 
+// command 是已解码的客户端请求；版本与控制代次用于拒绝过期操作。
 type command struct {
+	// RequestID 在同身份内标识幂等请求；相同标识但不同负载会被拒绝。
 	RequestID string `json:"requestID"`
-	Version   int64  `json:"version"`
-	Action    string `json:"action"`
-	HandID    int64  `json:"handID,omitempty"`
-	TurnID    int64  `json:"turnID,omitempty"`
-	PageID    string `json:"pageID"`
-	Control   int64  `json:"control"`
+	// Version 必须匹配房间当前版本，成功命令才推进该值。
+	Version int64  `json:"version"`
+	Action  string `json:"action"`
+	// HandID/TurnID 必须匹配当前局与行动机会，防止旧动作重放。
+	HandID int64  `json:"handID,omitempty"`
+	TurnID int64  `json:"turnID,omitempty"`
+	PageID string `json:"pageID"`
+	// Control 必须匹配当前页面控制代次。
+	Control int64 `json:"control"`
 }
 
 type outcome struct {
@@ -28,6 +34,7 @@ type receipt struct {
 	Result outcome
 }
 
+// 【共用】幂等与原子命令事务。
 // Caller holds App.mu; state and retry results live only in this process.
 func (a *App) apply(id string, cmd command) (outcome, bool) {
 	control := a.state.Controls[id]
@@ -86,6 +93,7 @@ func (a *App) apply(id string, cmd command) (outcome, bool) {
 	} else if control.PageID == cmd.PageID && control.Generation != cmd.Control {
 		rejection = "taken_over"
 	} else {
+		// 【加入与离开房间#5b/12】改状态：加入分支占座并建立控制页代次。
 		kind := "join"                 // 首次占用空位。
 		if a.state.Seats[seat] == id { // 同身份成功重新入房。
 			kind = "return" // 不重新播历史事件。

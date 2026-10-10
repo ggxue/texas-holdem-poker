@@ -1,3 +1,4 @@
+// All methods below run under App.mu. Only one cancellable wake owns timer work.
 package poker
 
 import (
@@ -5,7 +6,10 @@ import (
 	"time"
 )
 
-// All methods below run under App.mu. Only one cancellable wake owns timer work.
+// 【视图构造与推送#2/8】构造视图 deadlines.go:visibleTo
+// 上一步：#1 app.go:ServeHTTP；下一步：#3 state.go:visibleTo
+// 职责：附加服务器权威时间。
+// 前置条件：请求身份已验证且调用方持锁；只组装服务器时间与故障状态，不写权威状态。
 func (a *App) visibleTo(id string) view {
 	v := a.state.visibleTo(id)               // 先裁剪该身份有权查看的状态。
 	v.ServerTime = a.clock.Now().UnixMilli() // 给页面换算服务器倒计时。
@@ -15,7 +19,11 @@ func (a *App) visibleTo(id string) view {
 	return v // 快照不会携带私有牌序。
 }
 
+// 【共用】绑定行动机会期限。
 func (a *App) ensureDeadline() string {
+	// 【机器人与超时#1/11】入口 deadlines.go:ensureDeadline：为新机会设期限。
+	// 链路：1. deadlines.go:ensureDeadline（新机会期限块） → 2. game.go:randomBotThinkSeconds → 3. deadlines.go:scheduleLocked → 4. deadlines.go:tickLocked → 5. state.go:clone → 6. game.go:act → 7. game.go:advance → 8. deadlines.go:ensureDeadline（下一机会期限块） → 9. hand_record.go:commitHandRecord → 10. announcements.go:commitAnnouncements → 11. socket.go:broadcast
+	// 下一步：#2 game.go:randomBotThinkSeconds
 	h := a.state.Hand // 行动期限属于本局的具体机会。
 	if h == nil {     // 未开局没有行动计时。
 		return "" // 不创建额外期限。
@@ -28,13 +36,13 @@ func (a *App) ensureDeadline() string {
 	if h.deadlineTurn != h.Turn || h.Deadline.IsZero() { // 只有新的行动机会才给30秒。
 		h.Deadline = a.clock.Now().Add(30 * time.Second) // 新期限从实际推进时起算。
 		h.ThinkingStarted = time.Time{}                  // 真人机会没有机器人显示依据。
-		if h.Players[h.Actor].ID == "bot" {              // 仅新机器人机会抽样一次。
+		if h.Players[h.Actor].ID == "bot" {              // 仅新机器人机会抽样一次。 haifeng: 机器人思考入口
 			seconds, err := a.botThinkSeconds()           // 不在等待期间持锁休眠。
 			if err != nil || seconds < 1 || seconds > 8 { // 无效离线配置与随机源错误都必须显式失败。
 				return "unavailable" // 由外层回滚本次事务。
 			}
 			h.ThinkingStarted = a.clock.Now()                                        // 保存刷新和重连共用的三十秒起算点。
-			h.Deadline = h.ThinkingStarted.Add(time.Duration(seconds) * time.Second) // 实际动作只等抽中的整数秒。
+			h.Deadline = h.ThinkingStarted.Add(time.Duration(seconds) * time.Second) // 实际动作只等抽中的整数秒。 haifeng: haifeng: 假装思考2~8秒
 			a.state.announce(announcement{Kind: "thinking", Seat: humanSeatCount})   // 每个新机器人机会只确认一次思考。
 		}
 		h.deadlineTurn = h.Turn // 将期限绑定当前行动标识。
@@ -60,6 +68,12 @@ func (a *App) nextDeadline() time.Time {
 	return next // 返回零值表示不需要定时器。
 }
 
+// 【机器人与超时#3/11】定时 deadlines.go:scheduleLocked
+// 上一步：#2 game.go:randomBotThinkSeconds；下一步：#4 deadlines.go:tickLocked
+// 【加入与离开房间#11/12】定时 deadlines.go:scheduleLocked
+// 上一步：#10 announcements.go:commitAnnouncements；下一步：#12 socket.go:broadcast
+// 职责：安排绝对期限唤醒。
+// 前置条件：调用方持有 App.mu；替换唯一有效 wake 并安排最早定时器；关闭或故障时停止调度。
 func (a *App) scheduleLocked() {
 	if a.timer != nil { // 已有唤醒可以被新状态取消。
 		a.timer.Stop() // 取消旧定时任务。
@@ -88,6 +102,10 @@ func (a *App) scheduleLocked() {
 	})
 }
 
+// 【机器人与超时#4/11】定时 deadlines.go:tickLocked
+// 上一步：#3 deadlines.go:scheduleLocked；下一步：#5 state.go:clone
+// 职责：按期限执行自动状态转换。
+// 前置条件：调用方持有 App.mu；处理已到期行动或离房并确认版本；失败回滚本次自动事件、设置 fault 并停止继续推进。
 func (a *App) tickLocked() {
 	if a.closed || a.fault != "" { // 不处理已经关闭或故障的应用。
 		return // 保留故障前权威状态。
@@ -124,7 +142,7 @@ func (a *App) tickLocked() {
 			action := "check"                         // 不欠注时自动过牌。
 			if h.Players[h.Actor].Street < h.Target { // 欠注时区分机器人规则与真人超时。
 				action = "fold"                     // 真人超时不能自动付钱。
-				if h.Players[h.Actor].ID == "bot" { // 机器人固定跟注，不分析牌力。
+				if h.Players[h.Actor].ID == "bot" { // 机器人固定跟注，不分析牌力。 haifeng: 不分析牌力直接跟注
 					action = "call" // 金额由统一规则按实际余额限制。
 				}
 			}
@@ -138,6 +156,7 @@ func (a *App) tickLocked() {
 			}
 		}
 		if rejection == "" { // 动作及离房成功后才为新机会建立期限。
+			// 【机器人与超时#8/11】定时：为自动动作之后形成的机会建立新期限。
 			rejection = a.ensureDeadline() // 期限抽样失败也属于同一原子事件。
 		}
 		if rejection != "" { // 出错时不保留部分扣款或资格变更。
@@ -155,6 +174,10 @@ func (a *App) tickLocked() {
 	}
 }
 
+// 【断线重连与控制页接管#11/12】改状态 deadlines.go:disconnectLocked
+// 上一步：#10 socket.go:serveSocket；下一步：#12 socket.go:broadcast
+// 职责：处理有效连接关闭后的宽限。
+// 前置条件：调用方持有 App.mu 且代次仍为当前；写入断线宽限并提交公开事件；过期连接关闭被忽略。
 func (a *App) disconnectLocked(id, pageID string, generation int64) {
 	a.tickLocked()                                                                                 // 先按已创建的绝对期限推进。
 	control := a.state.Controls[id]                                                                // 核对断线是否属于当前控制页。

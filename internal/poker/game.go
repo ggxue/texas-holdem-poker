@@ -1,3 +1,4 @@
+// 本文件实现牌局状态、动作规则、阶段推进与派奖；涉及流程：多条流程（共用）。
 package poker
 
 import (
@@ -9,10 +10,12 @@ import (
 )
 
 type participant struct {
-	ID       string    `json:"id"`
-	Seat     int       `json:"seat"`
-	Hole     []Card    `json:"hole,omitempty"`
-	Invested int64     `json:"invested"`
+	ID   string `json:"id"`
+	Seat int    `json:"seat"`
+	Hole []Card `json:"hole,omitempty"`
+	// Invested 是本局累计实际投入；弃牌或离房不退回。
+	Invested int64 `json:"invested"`
+	// Street 是本轮累计投入，换街清零但不改变 Invested。
 	Street   int64     `json:"street"`
 	Folded   bool      `json:"folded"`
 	AllIn    bool      `json:"allIn"`
@@ -22,20 +25,26 @@ type participant struct {
 	acted    bool
 }
 type hand struct {
-	ID               int64
-	Turn             int64
-	Stage            string
-	Pot              int64
-	Board            []Card
-	Players          []participant
-	Actor            int
-	Start            int
-	Target           int64
-	deck             []Card
-	cursor           int
-	showdown         bool
-	Deadline         time.Time
-	ThinkingStarted  time.Time
+	// ID 标识一局；Turn 每创建一个新的真实行动机会递增，重试不会推进。
+	ID   int64
+	Turn int64
+	// Stage 与 Pot 是当前局唯一权威阶段和底池；结算完成后 Pot 必须为零。
+	Stage   string
+	Pot     int64
+	Board   []Card
+	Players []participant
+	Actor   int
+	// Start 是开局一次确定的循环起点，整局行动与平局零头均复用。
+	Start int
+	// Target 是本轮最高投入，欠注只由 Target 与 Street 的差额决定。
+	Target   int64
+	deck     []Card
+	cursor   int
+	showdown bool
+	// Deadline 绑定当前 Turn；机器人另用 ThinkingStarted 保持重连展示起点稳定。
+	Deadline        time.Time
+	ThinkingStarted time.Time
+	// deadlineTurn 防止同一行动机会重复抽样或重置期限。
 	deadlineTurn     int64
 	records          []handRecordEntry
 	committedRecords int
@@ -60,6 +69,10 @@ type handView struct {
 	Record       []handRecordEntry `json:"record"`
 }
 
+// 【机器人与超时#2/11】定时 game.go:randomBotThinkSeconds
+// 上一步：#1 deadlines.go:ensureDeadline；下一步：#3 deadlines.go:scheduleLocked
+// 职责：抽取机器人等待时长。
+// 前置条件：仅为新机器人机会抽样；不改牌局；随机源失败返回错误并拒绝事务或报告自动故障。
 func randomBotThinkSeconds() (int, error) {
 	n, err := rand.Int(rand.Reader, big.NewInt(8)) // 八个整数秒各有相同概率。
 	if err != nil {                                // 随机源故障不能冒充有效机会。
@@ -68,7 +81,11 @@ func randomBotThinkSeconds() (int, error) {
 	return int(n.Int64()) + 1, nil // 返回一到八秒，不包含零秒。
 }
 
-func randomActionStart(seats []int) (int, error) {
+// 【开局#7/11】推进 game.go:randomActionStart
+// 上一步：#6 game.go:validDeck；下一步：#8 game.go:advance
+// 职责：抽取开局循环起点。
+// 前置条件：候选座位已固定且非空；不改牌局；随机源失败返回错误，开局事务不提交。
+func randomActionStart(seats []int) (int, error) { // haifeng: 随机确定首发玩家
 	n, err := rand.Int(rand.Reader, big.NewInt(int64(len(seats)))) // 从全部参赛候选中无偏等概率抽一个下标。
 	if err != nil {                                                // 随机源故障必须返回给开局事务。
 		return 0, err // 不以固定座位替代失败抽样。
@@ -76,6 +93,14 @@ func randomActionStart(seats []int) (int, error) {
 	return seats[int(n.Int64())], nil // 返回座位编号，空位不在候选内。
 }
 
+// 【开局#2/11】校验 game.go:validAction
+// 上一步：#1 app.go:ServeHTTP；下一步：#3 identity.go:identify
+// 【玩家动作#2/12】校验 game.go:validAction
+// 上一步：#1 app.go:ServeHTTP；下一步：#3 identity.go:identify
+// 【加入与离开房间#2/12】校验 game.go:validAction
+// 上一步：#1 app.go:ServeHTTP；下一步：#3 identity.go:identify
+// 职责：动作白名单校验。
+// 前置条件：动作字符串来自已解码请求；不改状态；不支持的动作使请求以 invalid_command 拒绝。
 func validAction(action string) bool {
 	return action == "join" || action == "start" || action == "check" || action == "bet" || action == "call" || action == "fold" || action == "allin" || action == "leave" // 全押金额仅由服务端余额决定。
 }
@@ -98,6 +123,8 @@ func shuffledDeck() ([]Card, error) {
 	return cards, nil // 返回服务端私有牌序。
 }
 
+// 【视图构造与推送#4/8】构造视图 game.go:hand.visibleTo
+// 上一步：#3 state.go:visibleTo；下一步：#5 hand_record.go:copyHandRecord
 func (h *hand) visibleTo(id string) *handView {
 	v := &handView{ID: h.ID, Turn: h.Turn, Stage: h.Stage, Pot: h.Pot, Board: append([]Card{}, h.Board...), Target: h.Target, Players: make([]participant, len(h.Players)), CallAmount: "0", CallRequired: "0", AllInAmount: "0"} // 构造独立快照，非行动者没有扣款提示。
 	v.StartSeat = h.Players[h.Start].Seat                                                                                                                                                                                         // 全局保留同一公开行动起点，包含已全押或离房者。
@@ -143,12 +170,20 @@ func (s *room) setBalance(id string, n int64) {
 	s.Accounts[id] = p  // 保存该身份的钱包。
 }
 
+// 【开局#5/11】推进 game.go:gameCommand
+// 上一步：#4 commands.go:apply；下一步：#6 game.go:validDeck
+// 【玩家动作#6/12】校验 game.go:gameCommand
+// 上一步：#5 state.go:clone；下一步：#7 game.go:act
+// 【加入与离开房间#5a/12】改状态 game.go:gameCommand
+// 上一步：#4 commands.go:apply；下一步：#6a game.go:depart
+// 职责：分派开局、玩家命令及离房。
+// 前置条件：调用方持有 App.mu；校验房主、牌局和当前行动机会后转交状态规则；失败返回对应拒绝原因，由外层事务回滚。
 func (a *App) gameCommand(id string, cmd command) string {
 	s := &a.state              // 全部牌局变更在App锁内处理。
 	if cmd.Action == "leave" { // 主动退出不需要等到本人回合。
 		return s.depart(id) // 立即释放座位并失去未结算资格。
 	}
-	if cmd.Action == "start" { // 房主手动开局。
+	if cmd.Action == "start" { // 房主手动开局。 // haifeng:开局入口
 		if len(s.Disconnected) > 0 || len(s.Connecting) > 0 { // 有断线或尚未建立控制连接者时不能开新局。
 			return "connection_grace" // 避免对离线玩家补给或扣底注。
 		}
@@ -197,12 +232,12 @@ func (a *App) gameCommand(id string, cmd command) string {
 		}
 		for i := range h.Players { // 所有检查成功后统一扣款发牌。
 			p := &h.Players[i]                                                                                                      // 取得参赛者。
-			s.setBalance(p.ID, s.balance(p.ID)-1)                                                                                   // 支付一枚底注。
+			s.setBalance(p.ID, s.balance(p.ID)-1)                                                                                   // 支付一枚底注。 haifeng: 对每个玩家收1枚底注
 			p.Invested = 1                                                                                                          // 底注计入总投入，不计入本轮跟注。
 			p.AllIn = s.balance(p.ID) == 0                                                                                          // 底注扣完为零即全押。
 			h.Pot++                                                                                                                 // 实际扣款进入唯一底池。
 			s.record(handRecordEntry{Kind: "ante", Stage: "start", ParticipantID: p.ID, Seat: p.Seat, Amount: "1", AllIn: p.AllIn}) // 底注逐步快照。
-			p.Hole = append([]Card{}, h.deck[h.cursor:h.cursor+2]...)                                                               // 发两张唯一的私人手牌。
+			p.Hole = append([]Card{}, h.deck[h.cursor:h.cursor+2]...)                                                               // 发两张唯一的私人手牌。 haifeng: 给每个玩家发两张底牌
 			h.cursor += 2                                                                                                           // 移动服务端发牌游标。
 		}
 		s.Hand = h                                        // 提交新牌局。
@@ -224,9 +259,14 @@ func (a *App) gameCommand(id string, cmd command) string {
 	if rejection := s.act(cmd.Action, "manual"); rejection != "" { // 通过统一动作规则校验并执行。
 		return rejection // 动作失败时向调用者报告错误。
 	} // 校验动作后才改变状态。
+	// 【玩家动作#9/12】推进：动作规则通过后进入统一的后续推进代码块。
 	return s.advance() // 自动执行机器人并推进阶段。
 }
 
+// 【开局#6/11】校验 game.go:validDeck
+// 上一步：#5 game.go:gameCommand；下一步：#7 game.go:randomActionStart
+// 职责：牌序完整性校验。
+// 前置条件：牌序由服务端牌源提供；不改状态；无效牌组返回 false 并拒绝开局。
 func validDeck(deck []Card) bool {
 	if len(deck) != 52 { // 完整牌序必须为52张。
 		return false // 发现无效牌序立即拒绝。
@@ -241,7 +281,12 @@ func validDeck(deck []Card) bool {
 	return true // 完整且唯一。
 }
 
+// 【共用】统一推进与结算入口。
 func (s *room) advance() string {
+	// 【阶段推进与结算#1/11】入口 game.go:advance
+	// 链路：1. game.go:advance（阶段决策块） → 2. game.go:revealNextStreet → 3. game.go:deal → 4. game.go:advance（补牌后的继续推进块） → 5. game.go:settle → 6. cards.go:Evaluate → 7. cards.go:evaluateFive → 8. cards.go:Strength.Compare → 9. hand_record.go:record → 10. announcements.go:commitAnnouncements → 11. socket.go:broadcast
+	// 下一步：#2 game.go:revealNextStreet
+
 	h := s.Hand // 取得当前牌局。
 	for {       // 连续处理机器人和无需真人输入的阶段。
 		alive, capable := 0, 0        // 统计领奖资格及下注能力。
@@ -298,6 +343,7 @@ func (s *room) advance() string {
 		case "river": // 河牌轮结束后结算。
 			return s.settle(true) // 河牌轮结束摊牌。
 		}
+		// 【阶段推进与结算#4/11】推进：揭牌后回到循环，判断是否继续或结算。
 		h.Target = 0               // 新轮没有下注目标。
 		h.Actor = -1               // 新轮沿本局已确定起点扫描，空位跳过。
 		for i := range h.Players { // 依次更新各参赛者。
@@ -306,28 +352,41 @@ func (s *room) advance() string {
 		} // 重置轮内动作和投入。
 	}
 }
-func (h *hand) deal(n int) {
+
+// 【阶段推进与结算#3/11】改状态 game.go:deal
+// 上一步：#2 game.go:revealNextStreet；下一步：#4 game.go:advance
+// 职责：从服务端牌序揭牌。
+// 前置条件：私有牌序仍有足够公共牌；推进发牌游标并追加 Board；不公开剩余牌序。
+func (h *hand) deal(n int) { // haifeng: 发牌执行
 	h.Board = append(h.Board, h.deck[h.cursor:h.cursor+n]...) // 只从私有牌序追加公共牌。
 	h.cursor += n                                             // 移动牌序游标。
 }
 
-func (s *room) revealNextStreet() {
+// 【阶段推进与结算#2/11】改状态 game.go:revealNextStreet
+// 上一步：#1 game.go:advance；下一步：#3 game.go:deal
+// 职责：按公共牌数揭示下一阶段。
+// 前置条件：当前牌局及服务端牌序有效；推进 Stage/Board 并暂存公开事实；事务失败时随快照回滚。
+func (s *room) revealNextStreet() { // haifeng: 发桌面牌入口
 	h := s.Hand           // 只根据已有公开牌数量推进。
 	n := 1                // 转牌与河牌各一张。
 	switch len(h.Board) { // 无人下注时也完整记录各阶段。
 	case 0: // 第一批公共牌。
-		h.Stage, n = "flop", 3 // 翻牌三张。
+		h.Stage, n = "flop", 3 // 翻牌三张。 haifeng: 翻牌三张
 	case 3: // 已有翻牌。
-		h.Stage = "turn" // 转牌阶段。
+		h.Stage = "turn" // 转牌阶段。haifeng: 转牌一张
 	case 4: // 已有转牌。
-		h.Stage = "river" // 河牌阶段。
+		h.Stage = "river" // 河牌阶段。haifeng: 河牌一张
 	}
 	h.deal(n)                                          // 发牌仍只在服务端。
 	s.announce(announcement{Kind: h.Stage, Seat: -1})  // 音频不会携带卡牌信息。
 	s.record(handRecordEntry{Kind: h.Stage, Seat: -1}) // 文字过程保留这时已经公开的公共牌。
 }
 
-func (s *room) settle(showdown bool) string {
+// 【阶段推进与结算#5/11】结算 game.go:settle
+// 上一步：#4 game.go:advance；下一步：#6 cards.go:Evaluate
+// 职责：核算整池奖项与摊牌。
+// 前置条件：牌局尚未结算且参赛名单固定；更新赢家余额、奖项与结束状态；无赢家或余额溢出返回错误供外层回滚。
+func (s *room) settle(showdown bool) string { // haifeng: 摊牌入口
 	h := s.Hand                // 结算只针对当前局。
 	if h.Stage == "finished" { // 检查是否已经结算。
 		return "" // 本次推进成功，停止自动处理。
@@ -354,7 +413,7 @@ func (s *room) settle(showdown bool) string {
 	if len(winners) == 0 { // 结算必须存在有效赢家。
 		return "no_winner" // 无赢家时报告状态故障。
 	} // 无有效玩家时不得凭空分配。
-	share, remainder := h.Pot/int64(len(winners)), h.Pot%int64(len(winners)) // 整数平分并保留零头。
+	share, remainder := h.Pot/int64(len(winners)), h.Pot%int64(len(winners)) // 整数平分并保留零头。 haifeng: 清分奖金
 	ordered := make([]int, 0, len(winners))                                  // 零头只给赢家，顺序沿本局起点循环。
 	for offset := 0; offset < len(h.Players); offset++ {                     // 起点即使已离房仍保留，不重新抽选。
 		i := (h.Start + offset) % len(h.Players) // 与每轮行动使用同一个座位循环。
@@ -397,12 +456,16 @@ func (s *room) settle(showdown bool) string {
 		h.Players[i].Balance = s.balance(h.Players[i].ID) // 保存该玩家结算时的余额。
 	} // 保存结算时余额快照。
 	h.Pot = 0             // 清空已分配底池。
-	h.Stage = "finished"  // 标记本局只结算一次。
+	h.Stage = "finished"  // 标记本局只结算一次。 haifeng: 结束本局
 	h.Actor = -1          // 已结束不再接受行动。
 	h.showdown = showdown // 仅摊牌才公开有效玩家暗牌。
 	return ""             // 结果保留到下一次开局。
 }
 
+// 【玩家动作#8/12】校验 game.go:legal
+// 上一步：#7 game.go:act；下一步：#9 game.go:gameCommand
+// 职责：与视图及执行共用动作资格。
+// 前置条件：Actor 指向当前参赛者；仅读状态并返回合法动作；已弃牌或全押时返回空列表。
 func (h *hand) legal(balance int64) []string {
 	p := h.Players[h.Actor]  // 读取当前玩家的轮内投入。
 	if p.Folded || p.AllIn { // 已弃牌或全押者不能行动。
@@ -426,7 +489,14 @@ func (h *hand) legal(balance int64) []string {
 	} // 已全押者不会重新获得动作。
 	return actions // 服务器统一决定合法按钮。
 }
-func (s *room) act(action, reason string) string {
+
+// 【玩家动作#7/12】改状态 game.go:act
+// 上一步：#6 game.go:gameCommand；下一步：#8 game.go:legal
+// 【机器人与超时#6/11】改状态 game.go:act
+// 上一步：#5 state.go:clone；下一步：#7 game.go:advance
+// 职责：执行统一下注规则。
+// 前置条件：Actor 与当前局/回合已通过校验；更新投入、余额、底池及应答状态；非法动作或溢出返回原因，外层恢复快照。
+func (s *room) act(action, reason string) string { //haifeng: 玩家操作入口
 	h := s.Hand                                                         // 动作只作用于当前牌局。
 	valid := false                                                      // 默认动作无效。
 	for _, allowed := range h.legal(s.balance(h.Players[h.Actor].ID)) { // 与公开按钮共用服务端合法性判断。
@@ -438,14 +508,17 @@ func (s *room) act(action, reason string) string {
 		return "invalid_action" // 向页面返回非法动作提示。
 	} // 非法动作不改变状态。
 	p := &h.Players[h.Actor] // 取得当前行动者。
-	amount := int64(0)       // 过牌和弃牌不扣款。
-	if action == "bet" {     // 固定下注需要扣十枚或全部余额。
+	// 【玩家动作#7c/12】过牌：合法零额动作保持底池与余额不变。
+	amount := int64(0)   // 过牌和弃牌不扣款。
+	if action == "bet" { // 固定下注需要扣十枚或全部余额。 haifeng: 下注金额固定为10枚
 		amount = 10 // 设置标准下注金额。
 	} // 首次主动下注固定十枚。
-	if action == "call" { // 跟注只补本轮欠款。
+	// 【玩家动作#7a/12】跟注：仅补本轮欠额并受本人余额限制。
+	if action == "call" { // 跟注只补本轮欠款。 haifeng: 不够下注时跟注
 		amount = h.Target - p.Street // 计算当前欠注，不抵底注。
 	} // 跟注只补本轮差额，底注不抵扣。
-	if action == "allin" { // 主动全押不接受客户端金额。
+	// 【玩家动作#7d/12】全押：金额由服务端剩余余额确定。
+	if action == "allin" { // 主动全押不接受客户端金额。 haifeng: 全押
 		amount = s.balance(p.ID) // 本次投入全部剩余筹码。
 	} // 之前本轮投入仍另外累计到目标。
 	if amount > s.balance(p.ID) { // 余额不足时不能透支。
@@ -454,7 +527,8 @@ func (s *room) act(action, reason string) string {
 	if amount > math.MaxInt64-h.Pot || amount > math.MaxInt64-p.Invested { // 投入及底池累加必须能用整数表示。
 		return "chips_overflow" // 拒绝会溢出的扣款。
 	} // 扣款前检查整数累加。
-	if action == "fold" { // 弃牌会失去本局领奖资格。
+	// 【玩家动作#7b/12】弃牌：失去本局领奖资格且不退回已投入。
+	if action == "fold" { // 弃牌会失去本局领奖资格。 haifeng: 弃牌
 		p.Folded = true // 标记玩家已经弃牌。
 	} // 弃牌立即失去领奖资格。
 	if p.Street+amount > h.Target { // 更高的本轮累计投入要求此前玩家重新回应。
@@ -468,12 +542,16 @@ func (s *room) act(action, reason string) string {
 	p.Invested += amount                                                                                                                                                // 累加本局投入。
 	h.Pot += amount                                                                                                                                                     // 全部有效投入进单池，不退款。
 	p.AllIn = p.AllIn || s.balance(p.ID) == 0                                                                                                                           // 全押资格不因重连补给而重置。
-	p.acted = true                                                                                                                                                      // 记录当前机会已经完成。
+	p.acted = true                                                                                                                                                      // 记录当前机会已经完成。 haifeng: 无操作默认过牌
 	s.announce(announcement{Kind: "action", Seat: p.Seat, Action: action, Amount: strconv.FormatInt(amount, 10), AllIn: p.AllIn, Reason: reason})                       // 记录实际扣款与确认原因，不从快照猜测动作。
 	s.record(handRecordEntry{Kind: "action", ParticipantID: p.ID, Seat: p.Seat, Action: action, Amount: strconv.FormatInt(amount, 10), AllIn: p.AllIn, Reason: reason}) // 保存实际扣款后的公开事实。
 	return ""                                                                                                                                                           // 同一内存变更统一生效。
 }
 
+// 【加入与离开房间#7/12】改状态 game.go:release
+// 上一步：#6a game.go:depart；下一步：#8 game.go:advance
+// 职责：统一释放成员与参赛资格。
+// 前置条件：调用方持锁并给出离房原因；释放座位及未结算领奖资格；身份不在房间返回 not_in_room。
 func (s *room) release(id, reason string) string {
 	seat := -1                         // 查找该身份当前占用的真人座位。
 	for i, occupant := range s.Seats { // 只释放本人座位。
@@ -520,6 +598,10 @@ func (s *room) release(id, reason string) string {
 	return "" // 资格与座位已经更新，统一推进时所有投入不退。
 }
 
+// 【加入与离开房间#6a/12】推进 game.go:depart
+// 上一步：#5a game.go:gameCommand；下一步：#7 game.go:release
+// 职责：处理主动离房。
+// 前置条件：命令事务持锁；主动释放成员座位并推进未结算牌局；无座位返回 not_in_room。
 func (s *room) depart(id string) string {
 	if rejection := s.release(id, "manual"); rejection != "" { // 先释放席位与未结算资格。
 		return rejection // 无座位时报告无效退出。

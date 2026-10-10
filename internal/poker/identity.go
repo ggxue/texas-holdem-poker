@@ -1,3 +1,4 @@
+// 本文件验证和签发签名身份凭据；涉及流程：断线重连与控制页接管、加入与离开房间。
 package poker
 
 import (
@@ -12,6 +13,7 @@ import (
 
 const cookieName = "poker_identity"
 
+// 【共用】稳定身份校验。
 func (a *App) identify(r *http.Request) (string, string, error) {
 	if cookie, err := r.Cookie(cookieName); err == nil {
 		parts := strings.Split(cookie.Value, ".")

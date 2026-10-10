@@ -1,12 +1,15 @@
+// 本文件记录并快照单局公开事实；涉及流程：多条流程（共用）。
 package poker
 
 import "strconv"
 
 // handRecordEntry是公开事实快照，不携带私人手牌或未来牌序。
 type handRecordEntry struct {
-	ID            string `json:"id"`
-	HandID        int64  `json:"handID"`
-	Seq           int    `json:"seq"`
+	// ID 在事务确认时由版本与局内序号生成；Seq 仅在本局内递增。
+	ID     string `json:"id"`
+	HandID int64  `json:"handID"`
+	Seq    int    `json:"seq"`
+	// At 是事实确认时的服务端时间，后续钱包变化不重写已存快照。
 	At            int64  `json:"at"`
 	Stage         string `json:"stage"`
 	Kind          string `json:"kind"`
@@ -21,6 +24,10 @@ type handRecordEntry struct {
 	Board         []Card `json:"board,omitempty"`
 }
 
+// 【阶段推进与结算#9/11】改状态 hand_record.go:record
+// 上一步：#8 cards.go:Strength.Compare；下一步：#10 announcements.go:commitAnnouncements
+// 职责：暂存公开局内事实。
+// 前置条件：记录属于当前内存牌局事务；追加公开快照；无当前牌局时不建立跨局记录。
 func (s *room) record(e handRecordEntry) {
 	h := s.Hand   // 当前局是记录唯一的内存归属。
 	if h == nil { // 无牌局不创建跨局历史。
@@ -40,6 +47,10 @@ func (s *room) record(e handRecordEntry) {
 	h.records = append(h.records, e)          // 草稿与扣款共用回滚边界。
 }
 
+// 【机器人与超时#9/11】推进 hand_record.go:commitHandRecord
+// 上一步：#8 deadlines.go:ensureDeadline；下一步：#10 announcements.go:commitAnnouncements
+// 职责：确认本次局内记录。
+// 前置条件：状态事务已成功确认；仅为新增公开记录赋予稳定ID与权威时间；不会改写已提交快照。
 func (a *App) commitHandRecord() {
 	h := a.state.Hand // 只有确认事务成功后才赋予标识和时间。
 	if h == nil {     // 未开局没有待提交记录。
@@ -53,6 +64,10 @@ func (a *App) commitHandRecord() {
 	h.committedRecords = len(h.records) // 查询与重试不再赋予新身份。
 }
 
+// 【视图构造与推送#5/8】构造视图 hand_record.go:copyHandRecord
+// 上一步：#4 game.go:hand.visibleTo；下一步：#6a app.go:writeJSON
+// 职责：隔离记录快照切片。
+// 前置条件：输入记录属于当前只读快照；深拷贝记录及公共牌切片；不改写源数据。
 func copyHandRecord(records []handRecordEntry) []handRecordEntry {
 	copy := append([]handRecordEntry(nil), records...) // 事务与输出都取得独立切片。
 	for i := range copy {                              // 公共牌切片也不能被未来变更覆盖。

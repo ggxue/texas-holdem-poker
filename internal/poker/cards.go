@@ -1,3 +1,4 @@
+// 本文件校验牌面并评估德州扑克牌力；涉及流程：阶段推进与结算。
 package poker
 
 import (
@@ -5,7 +6,7 @@ import (
 	"sort"
 )
 
-// Card 使用点数2至14和花色0至3（方块、梅花、红桃、黑桃）。
+// Card 的 Rank 固定为2至14，Suit固定为0至3；一副牌中同一组合只能出现一次。
 type Card struct {
 	Rank int `json:"rank"`
 	Suit int `json:"suit"`
@@ -13,10 +14,14 @@ type Card struct {
 type Strength struct {
 	Category string  `json:"category"`
 	Cards    [5]Card `json:"cards"`
-	key      [6]int
+	// key 保存类别和逐级点数比较值，花色只在点数完全相同时决胜。
+	key [6]int
 }
 
-// Evaluate 从五至七张牌中选择最佳五张，完整点数比较优先于花色。
+// 【阶段推进与结算#6/11】校验 cards.go:Evaluate
+// 上一步：#5 game.go:settle；下一步：#7 cards.go:evaluateFive
+// 职责：选择最佳五张牌。
+// 前置条件：输入为待评估的已知牌集合；不改游戏状态；牌数、范围或重复校验失败返回错误。
 func Evaluate(cards []Card) (Strength, error) {
 	if len(cards) < 5 || len(cards) > 7 {
 		return Strength{}, fmt.Errorf("需要五至七张牌")
@@ -46,7 +51,12 @@ func Evaluate(cards []Card) (Strength, error) {
 	}
 	return best, nil
 }
-func evaluateFive(cards [5]Card) Strength {
+
+// 【阶段推进与结算#7/11】结算 cards.go:evaluateFive
+// 上一步：#6 cards.go:Evaluate；下一步：#8 cards.go:Strength.Compare
+// 职责：计算五张组合的比较键。
+// 前置条件：输入是已验证的五张组合；只计算牌力；不改变牌局。
+func evaluateFive(cards [5]Card) Strength { // haifeng: 计算各玩家最强牌力
 	sort.Slice(cards[:], func(i, j int) bool {
 		if cards[i].Rank != cards[j].Rank {
 			return cards[i].Rank > cards[j].Rank
@@ -109,7 +119,10 @@ func evaluateFive(cards [5]Card) Strength {
 	s.Category = [...]string{"高牌", "一对", "两对", "三条", "顺子", "同花", "葫芦", "四条", "同花顺", "同花大顺"}[s.key[0]]
 	return s
 }
-func (s Strength) Compare(other Strength) int {
+
+// 【阶段推进与结算#8/11】结算 cards.go:Strength.Compare
+// 上一步：#7 cards.go:evaluateFive；下一步：#9 hand_record.go:record
+func (s Strength) Compare(other Strength) int { // haifeng: 找出赢家
 	for i, n := range s.key {
 		if n > other.key[i] {
 			return 1

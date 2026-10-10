@@ -1,9 +1,11 @@
+// 本文件暂存并提交事务确认的公开事件；涉及流程：多条流程（共用）。
 package poker
 
 import "strconv"
 
 // announcement只携带确认的公开事实；金额用十进制字符串避免JS精度损失。
 type announcement struct {
+	// ID 在事务成功时由版本与批内序号组成，同一次HTTP/WS确认可去重。
 	ID     string `json:"id"`
 	Kind   string `json:"kind"`
 	Seat   int    `json:"seat"`
@@ -11,9 +13,10 @@ type announcement struct {
 	Amount string `json:"amount,omitempty"`
 	AllIn  bool   `json:"allIn,omitempty"`
 	Reason string `json:"reason,omitempty"`
-	At     int64  `json:"at"`
-	HandID int64  `json:"handID,omitempty"`
-	TurnID int64  `json:"turnID,omitempty"`
+	// At 是确认时的服务端毫秒时间，不作为客户端推断状态的依据。
+	At     int64 `json:"at"`
+	HandID int64 `json:"handID,omitempty"`
+	TurnID int64 `json:"turnID,omitempty"`
 }
 
 func (s *room) announce(e announcement) {
@@ -23,6 +26,7 @@ func (s *room) announce(e announcement) {
 	s.announcements = append(s.announcements, e) // 草稿与状态共同回滚。
 }
 
+// 【共用】提交已确认公开事件。
 func (a *App) commitAnnouncements() {
 	a.commitHandRecord()                      // 文字记录与瞬时公告在同一次成功提交中确认。
 	for i, e := range a.state.announcements { // 只有成功提交后才赋予事件身份。
