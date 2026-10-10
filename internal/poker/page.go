@@ -14,6 +14,7 @@ var pages embed.FS
 
 func servePage(w http.ResponseWriter, r *http.Request) {
 	file := ""
+	redirectToViewer := false
 	switch r.URL.Path {
 	case "/":
 		file = "index.html"
@@ -39,6 +40,17 @@ func servePage(w http.ResponseWriter, r *http.Request) {
 		file = "style.css"
 	case "/favicon.svg": // 浏览器标签复用本地黑桃圆章。
 		file = "favicon.svg" // 仍通过固定静态资源白名单提供。
+	case "/doc", "/doc/":
+		file = "docs/index.html"
+	case "/doc/viewer.css":
+		file = "docs/viewer.css"
+	case "/doc/viewer.js":
+		file = "docs/viewer.js"
+	case "/doc/sequence-diagram.png", "/doc/texas-poker-flow.png",
+		"/docs/", "/docs/sequence-diagram.png", "/docs/texas-poker-flow.png":
+		redirectToViewer = true
+	case "/doc/sequence-diagram-image.png":
+		file = "docs/sequence-diagram.png"
 	default:
 		if strings.HasPrefix(r.URL.Path, "/audio/") && path.Base(r.URL.Path) == strings.TrimPrefix(r.URL.Path, "/audio/") { // 只允许音频目录下的直接文件。
 			file = strings.TrimPrefix(r.URL.Path, "/") // embed目录仍是唯一来源。
@@ -49,6 +61,10 @@ func servePage(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	if redirectToViewer {
+		http.Redirect(w, r, "/doc", http.StatusTemporaryRedirect)
 		return
 	}
 	data, err := pages.ReadFile("web/" + file)

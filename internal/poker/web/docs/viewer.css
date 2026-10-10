@@ -1,0 +1,44 @@
+body {
+  margin: 0;
+  background: #111;
+}
+
+img {
+  display: block;
+  width: var(--diagram-width, 100vw);
+  max-width: none;
+  height: auto;
+  margin-inline: auto;
+}
+
+.zoom-controls {
+  position: fixed;
+  z-index: 1;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid #444;
+  border-radius: 10px;
+  background: #181818eF;
+  color: #fff;
+  font: 14px system-ui, sans-serif;
+}
+
+.zoom-controls output {
+  min-width: 4em;
+  text-align: center;
+}
+
+.zoom-controls button {
+  min-width: 36px;
+  min-height: 32px;
+  border: 1px solid #555;
+  border-radius: 6px;
+  background: #262626;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}

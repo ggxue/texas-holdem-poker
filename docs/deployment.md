@@ -3,6 +3,33 @@
 源码仓库为 [ggxue/texas-holdem-poker](https://github.com/ggxue/texas-holdem-poker)，发布分支为master。
 B2界面和中文播报已完成本地验收；用户已在既有Render服务试玩，当前还没有提供可独立核验的公网游戏地址。旧公网完整验收状态仍以[发布票05](../.scratch/poker-screen-audio/issues/05-release.md)和真实云票12为准，不将试玩反馈当完整验收。主动全押与黑桃图标的本地证据见[本轮验收](../.scratch/poker-confidence-action/acceptance-evidence.md)。
 
+## 在游戏域名发布 Mermaid 流程图 PNG
+
+图片位于 `internal/poker/web/docs/sequence-diagram.png`，由 Go 服务嵌入提供。
+分享链接使用居中查看页 `https://<游戏服务域名>/doc`；访问旧 `/docs/` 或 PNG 链接也会跳转到查看页。
+查看页使用 `/doc/sequence-diagram-image.png` 读取原图，不需要新建 `-doc` Static Site。
+
+要提交并推送这项改动，只暂存相关文件：
+
+```powershell
+git status --short
+git add -A -- docs/deployment.md internal/poker/page.go internal/poker/flowchart_test.go internal/poker/web/docs/sequence-diagram.png
+git diff --cached --stat
+git commit -m "feat: serve Mermaid flowchart from game URL"
+git push origin master
+```
+
+提交前检查暂存清单和图片确实是准备公开的内容。推送到服务所连的 `master` 后，在现有 Go
+Web Service 的 **Deploys → Manual Deploy → Deploy latest commit** 发布（若控制台已启用自动部署，
+则等待自动部署完成即可）。PNG 随程序编译进服务，不要把 Render Static Site 的
+Root Directory 指向 `public/docs` 或在那里运行 Go 构建。
+
+部署会重启 Go 进程并清空内存中的房间、牌局和筹码；等没有人在游戏时再部署。
+服务变为 Live 后，在无痕窗口访问完整 HTTPS 图片链接，或运行
+`curl.exe -I https://<游戏服务域名>/doc/sequence-diagram-image.png`，确认 HTTP 成功状态及
+`Content-Type: image/png`。以后替换同一路径的 PNG 并重新部署，原链接仍可使用；
+若更改文件名，也要同步修改 `internal/poker/page.go` 的固定路由和分享链接。
+
 ## 更新已有Render服务（本轮交接）
 
 本轮已在本地master提交主动全押、精确动作金额、中文全押播报和截图风格黑桃favicon。无需新建服务或修改现有构建/启动设置。
