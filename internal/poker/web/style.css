@@ -20,16 +20,16 @@
 /* Mobile A: six fixed seats with a separate, always visible action area. */
 .mobile-tools,.mobile-sheet{display:none}
 @media(max-width:700px){
-  .poker-app{height:100dvh;min-height:0;padding:8px 8px calc(var(--action-height,140px) + 16px + env(safe-area-inset-bottom,0px));grid-template-rows:auto minmax(0,1fr);gap:8px;overflow:hidden}
+  .poker-app{height:auto;min-height:100dvh;padding:8px;grid-template-rows:auto auto;gap:8px;overflow:visible}
   .app-header{display:grid;grid-template-columns:1fr auto;gap:4px 6px;align-items:center}
   .brand{gap:6px;min-width:0}.brand-mark{width:25px;height:25px;font-size:20px}.brand h1{font-size:16px}.brand .eyebrow{display:none}
   .header-controls{display:none}.mobile-tools{display:flex;gap:4px}.mobile-tools button{min-height:32px;padding:3px 7px}
   .status-bar{grid-column:1/-1;order:0;min-width:0;flex-basis:auto;border:0;padding:0}
   .headline{justify-content:space-between;gap:3px 6px}#status{margin-top:2px;line-height:1.25}#countdown{white-space:nowrap}
   .play-layout{display:block;min-height:0}.hand-reference,.results-panel,.app-footer{display:none}
-  .workspace{display:block;height:100%;min-height:0;overflow:auto;overscroll-behavior:contain}
-  .table{height:100%;min-height:406px}
-  .seats{height:100%;min-height:406px;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:120px minmax(138px,1fr) 120px;grid-template-areas:'s3 s4 s5' 's1 board s2' '. bot .';padding:8px 6px;gap:6px}
+  .workspace{display:block;height:auto;min-height:0;overflow:visible}
+  .table{height:auto;min-height:406px}
+  .seats{height:auto;min-height:406px;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:120px minmax(138px,1fr) 120px;grid-template-areas:'s3 s4 s5' 's1 board s2' '. bot .';padding:8px 6px;gap:6px}
   .seats::before{inset:0;border-radius:36%;border-width:5px}.seats::after{font-size:90px;width:120px;height:120px;line-height:120px}
   .place,.place[data-seat='4'],.place[data-seat='5']{width:100%;padding:0 0 20px;min-height:0;justify-self:stretch}
   .seat,.seat.mine{min-height:0;height:100%;padding:1px;gap:0;justify-content:center}
@@ -40,7 +40,7 @@
   .place[data-seat] .wallet,.wallet .physical-chips{width:50px;height:24px}.place[data-seat] .wallet{top:auto;bottom:-4px;left:50%;right:auto;transform:translateX(-50%)}
   .community{padding:0;min-width:0;width:100%}.pot{display:grid;gap:2px;margin:0 0 9px;justify-items:center}.pot .physical-chips{width:62px;height:30px}.pot-value{text-align:center;font-size:14px}.pot-value strong{font-size:20px}
   .board{gap:2px}.board .playing-card{width:21px;height:32px;padding:2px}.board .card-rank{font-size:14px}.board .card-suit{font-size:17px}
-  .action-panel{position:fixed;z-index:40;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));padding:9px 10px;gap:7px;background:linear-gradient(#422629,#29171d);box-shadow:0 -7px 22px #12090c88}
+  .action-panel{position:static;margin:8px 0;padding:9px 10px;gap:7px;background:linear-gradient(#422629,#29171d);box-shadow:0 -7px 22px #12090c88}
   .action-label{flex-wrap:wrap;gap:3px 8px}.action-label h2{font-size:14px}#action-hint{flex-basis:100%;line-height:1.25}
   #actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;min-height:44px}#actions button{min-height:44px;padding:5px 3px;font-size:14px}#actions button:only-child,#actions .action-empty{grid-column:1/-1}
   .mobile-tools button[aria-expanded='true']{border-color:var(--gold);background:#674237}
